@@ -20,6 +20,7 @@ TOOLS=(
     "tmux:tmux"
     "npm:npm"
     "unzip:unzip"
+    "python3:python3"
 )
 
 check_base_dir() {
