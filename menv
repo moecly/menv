@@ -78,7 +78,7 @@ cmd_link() {
 
 show_help() {
     cat <<EOF
-Usage: $0 <command>
+Usage: menv <command>
 
 Commands:
     init   Clone all repositories
@@ -88,10 +88,10 @@ Commands:
     help  Show this help
 
 Examples:
-    $0 init
-    $0 pull
-    $0 list
-    $0 link
+    menv init
+    menv pull
+    menv list
+    menv link
 EOF
 }
 
