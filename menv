@@ -9,6 +9,15 @@ REPOS=(
     "nvim:https://github.com/moecly/nvim-config.git"
 )
 
+TOOLS=(
+    "lazygit:lazygit"
+    "fd:fd fdfind"
+    "rg:rg"
+    "fzf:fzf"
+    "nvim:nvim"
+    "tmux:tmux"
+)
+
 check_base_dir() {
     if [[ ! -d "$BASE_DIR" ]]; then
         mkdir -p "$BASE_DIR"
@@ -63,6 +72,26 @@ cmd_list() {
     done
 }
 
+cmd_doctor() {
+    echo "Checking tools..."
+    for tool in "${TOOLS[@]}"; do
+        name="${tool%%:*}"
+        cmds="${tool#*:}"
+        found=0
+        for cmd in $cmds; do
+            if command -v "$cmd" >/dev/null 2>&1; then
+                found=1
+                break
+            fi
+        done
+        if [[ $found -eq 1 ]]; then
+            printf "✓ %-8s found\n" "$name"
+        else
+            printf "✗ %-8s not found\n" "$name"
+        fi
+    done
+}
+
 cmd_link() {
     for item in "${REPOS[@]}"; do
         name="${item%%:*}"
@@ -81,17 +110,19 @@ show_help() {
 Usage: menv <command>
 
 Commands:
-    init   Clone all repositories
-    pull  Pull all repositories (including menv itself)
-    list  List all repositories
-    link  Execute link.sh in all repositories
-    help  Show this help
+    init    Clone all repositories
+    pull   Pull all repositories (including menv itself)
+    list   List all repositories
+    link   Execute link.sh in all repositories
+    doctor Check required tools
+    help   Show this help
 
 Examples:
     menv init
     menv pull
     menv list
     menv link
+    menv doctor
 EOF
 }
 
@@ -99,10 +130,11 @@ main() {
     cmd="$1"
     shift || true
     case "$cmd" in
-        init)   cmd_init ;;
-        pull)  cmd_pull ;;
-        list)  cmd_list ;;
-        link)  cmd_link ;;
+        init)    cmd_init ;;
+        pull)   cmd_pull ;;
+        list)   cmd_list ;;
+        link)   cmd_link ;;
+        doctor) cmd_doctor ;;
         help|--help|-h) show_help ;;
         "")
             show_help
