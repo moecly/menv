@@ -19,6 +19,7 @@ TOOLS=(
     "nvim:nvim"
     "tmux:tmux"
     "npm:npm"
+    "unzip:unzip"
 )
 
 check_base_dir() {
