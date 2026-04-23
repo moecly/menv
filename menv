@@ -10,6 +10,7 @@ REPOS=(
 )
 
 TOOLS=(
+    "git:git"
     "lazygit:lazygit"
     "fd:fd fdfind"
     "rg:rg"
