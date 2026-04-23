@@ -14,6 +14,7 @@ TOOLS=(
     "fd:fd fdfind"
     "rg:rg"
     "fzf:fzf"
+    "zsh:zsh"
     "nvim:nvim"
     "tmux:tmux"
 )
