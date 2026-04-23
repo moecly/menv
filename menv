@@ -1,0 +1,102 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="${MOECLY_DIR:-$HOME/.test_conf}"
+
+REPOS=(
+    "tmux:https://github.com/moecly/tmux-config.git"
+    "zsh:https://github.com/moecly/zsh-config.git"
+    "nvim:https://github.com/moecly/nvim-config.git"
+)
+
+check_base_dir() {
+    if [[ ! -d "$BASE_DIR" ]]; then
+        mkdir -p "$BASE_DIR"
+    fi
+}
+
+cmd_init() {
+    check_base_dir
+    for item in "${REPOS[@]}"; do
+        name="${item%%:*}"
+        url="${item#*:}"
+        repo_path="$BASE_DIR/$name"
+        if [[ -d "$repo_path" ]]; then
+            echo "[$name] already exists, skip"
+        else
+            echo "Cloning $url..."
+            git clone "$url" "$repo_path"
+        fi
+    done
+}
+
+cmd_pull() {
+    echo "=== Updating menv ==="
+    if [[ -d "$SCRIPT_DIR/.git" ]]; then
+        git -C "$SCRIPT_DIR" pull
+    else
+        echo "menv is not a git repository, skip"
+    fi
+
+    for item in "${REPOS[@]}"; do
+        name="${item%%:*}"
+        repo_path="$BASE_DIR/$name"
+        if [[ -d "$repo_path/.git" ]]; then
+            echo "=== Pulling $name ==="
+            git -C "$repo_path" pull
+        fi
+    done
+}
+
+cmd_list() {
+    echo "Repositories in $BASE_DIR:"
+    echo "--------------------------"
+    for item in "${REPOS[@]}"; do
+        name="${item%%:*}"
+        repo_path="$BASE_DIR/$name"
+        if [[ -d "$repo_path/.git" ]]; then
+            status="cloned"
+        else
+            status="not cloned"
+        fi
+        printf "%-10s %s\n" "$name" "$status"
+    done
+}
+
+show_help() {
+    cat <<EOF
+Usage: $0 <command>
+
+Commands:
+    init   Clone all repositories
+    pull  Pull all repositories (including menv itself)
+    list  List all repositories
+    help  Show this help
+
+Examples:
+    $0 init
+    $0 pull
+    $0 list
+EOF
+}
+
+main() {
+    cmd="$1"
+    shift || true
+    case "$cmd" in
+        init)   cmd_init ;;
+        pull)   cmd_pull ;;
+        list)   cmd_list ;;
+        help|--help|-h) show_help ;;
+        "")
+            show_help
+            ;;
+        *)
+            echo "Unknown command: $cmd"
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
