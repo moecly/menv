@@ -63,6 +63,19 @@ cmd_list() {
     done
 }
 
+cmd_link() {
+    for item in "${REPOS[@]}"; do
+        name="${item%%:*}"
+        link_script="$BASE_DIR/$name/link.sh"
+        if [[ -x "$link_script" ]]; then
+            echo "=== Linking $name ==="
+            "$link_script"
+        else
+            echo "[$name] link.sh not found or not executable, skip"
+        fi
+    done
+}
+
 show_help() {
     cat <<EOF
 Usage: $0 <command>
@@ -71,12 +84,14 @@ Commands:
     init   Clone all repositories
     pull  Pull all repositories (including menv itself)
     list  List all repositories
+    link  Execute link.sh in all repositories
     help  Show this help
 
 Examples:
     $0 init
     $0 pull
     $0 list
+    $0 link
 EOF
 }
 
@@ -85,8 +100,9 @@ main() {
     shift || true
     case "$cmd" in
         init)   cmd_init ;;
-        pull)   cmd_pull ;;
-        list)   cmd_list ;;
+        pull)  cmd_pull ;;
+        list)  cmd_list ;;
+        link)  cmd_link ;;
         help|--help|-h) show_help ;;
         "")
             show_help
