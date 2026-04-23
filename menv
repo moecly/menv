@@ -18,6 +18,7 @@ TOOLS=(
     "zsh:zsh"
     "nvim:nvim"
     "tmux:tmux"
+    "npm:npm"
 )
 
 check_base_dir() {
