@@ -3,6 +3,18 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BASE_DIR="${MOECLY_DIR:-$HOME/.moecly_conf}"
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+div() {
+    printf "${CYAN}%s${NC}\n" "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
 REPOS=(
     "tmux:https://github.com/moecly/tmux-config.git"
     "zsh:https://github.com/moecly/zsh-config.git"
@@ -33,54 +45,74 @@ check_base_dir() {
 
 cmd_init() {
     check_base_dir
+    echo
+    echo -e "${BOLD}Initializing repositories...${NC}"
+    div
     for item in "${REPOS[@]}"; do
         name="${item%%:*}"
         url="${item#*:}"
         repo_path="$BASE_DIR/$name"
         if [[ -d "$repo_path" ]]; then
-            echo "[$name] already exists, skip"
+            echo -e "  ${YELLOW}⊝${NC}  $name"
         else
-            echo "Cloning $url..."
-            git clone "$url" "$repo_path"
+            echo -n -e "  ${GREEN}⬢${NC}  Cloning $name... "
+            if git clone "$url" "$repo_path" 2>/dev/null; then
+                echo -e "${GREEN}done${NC}"
+            else
+                echo -e "${RED}failed${NC}"
+            fi
         fi
     done
+    div
 }
 
 cmd_pull() {
-    echo "=== Updating menv ==="
+    echo
+    div
+    echo -e "${BOLD}  ⬇  Updating menv${NC}"
     if [[ -d "$SCRIPT_DIR/.git" ]]; then
         git -C "$SCRIPT_DIR" pull
     else
-        echo "menv is not a git repository, skip"
+        echo -e "  ${YELLOW}⊝${NC}  menv is not a git repository"
     fi
+    div
 
     for item in "${REPOS[@]}"; do
         name="${item%%:*}"
         repo_path="$BASE_DIR/$name"
         if [[ -d "$repo_path/.git" ]]; then
-            echo "=== Pulling $name ==="
+            echo -e "${CYAN}⬇${NC}  Pulling $name"
             git -C "$repo_path" pull
         fi
     done
+    div
 }
 
 cmd_list() {
-    echo "Repositories in $BASE_DIR:"
-    echo "--------------------------"
+    echo
+    div
+    echo -e "${BOLD}  ⬡  Repositories in ${BASE_DIR}${NC}"
+    div
     for item in "${REPOS[@]}"; do
         name="${item%%:*}"
         repo_path="$BASE_DIR/$name"
         if [[ -d "$repo_path/.git" ]]; then
-            status="cloned"
+            status="${GREEN}cloned${NC}"
+            icon="${GREEN}✓${NC}"
         else
-            status="not cloned"
+            status="${YELLOW}not cloned${NC}"
+            icon="${YELLOW}⊝${NC}"
         fi
-        printf "%-10s %s\n" "$name" "$status"
+        printf "  $icon  %-10s %b\n" "$name" "$status"
     done
+    div
 }
 
 cmd_doctor() {
-    echo "Checking tools..."
+    echo
+    div
+    echo -e "${BOLD}  ⚙  Checking tools...${NC}"
+    div
     for tool in "${TOOLS[@]}"; do
         name="${tool%%:*}"
         cmds="${tool#*:}"
@@ -92,39 +124,48 @@ cmd_doctor() {
             fi
         done
         if [[ $found -eq 1 ]]; then
-            printf "✓ %-8s found\n" "$name"
+            printf "  ${GREEN}✓${NC}  %-8s ${GREEN}found${NC}\n" "$name"
         else
-            printf "✗ %-8s not found\n" "$name"
+            printf "  ${RED}✗${NC}  %-8s ${RED}not found${NC}\n" "$name"
         fi
     done
+    div
 }
 
 cmd_link() {
+    echo
+    div
+    echo -e "${BOLD}  ⇲  Linking dotfiles...${NC}"
+    div
     for item in "${REPOS[@]}"; do
         name="${item%%:*}"
         link_script="$BASE_DIR/$name/link.sh"
         if [[ -x "$link_script" ]]; then
-            echo "=== Linking $name ==="
+            echo -e "${CYAN}⟹${NC}  Linking $name"
             "$link_script"
         else
-            echo "[$name] link.sh not found or not executable, skip"
+            echo -e "  ${YELLOW}⊝${NC}  $name link.sh not found or executable"
         fi
     done
+    div
 }
 
 show_help() {
     cat <<EOF
-Usage: menv <command>
 
-Commands:
-    init    Clone all repositories
-    pull   Pull all repositories (including menv itself)
-    list   List all repositories
-    link   Execute link.sh in all repositories
-    doctor Check required tools
-    help   Show this help
+  ${BOLD}menv${NC} - Development Environment Manager
 
-Examples:
+${CYAN}Usage:${NC}
+    menv <command>
+
+${CYAN}Commands:${NC}
+    ${GREEN}init${NC}    Clone all repositories
+    ${GREEN}pull${NC}   Pull all repositories (including menv itself)
+    ${GREEN}list${NC}   List all repositories
+    ${GREEN}link${NC}   Execute link.sh in all repositories
+    ${GREEN}doctor${NC} Check required tools
+
+${CYAN}Examples:${NC}
     menv init
     menv pull
     menv list
@@ -147,7 +188,7 @@ main() {
             show_help
             ;;
         *)
-            echo "Unknown command: $cmd"
+            echo -e "${RED}Error:${NC} Unknown command: $cmd"
             show_help
             exit 1
             ;;
