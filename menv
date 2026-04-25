@@ -151,27 +151,25 @@ cmd_link() {
 }
 
 show_help() {
-    cat <<EOF
-
-  ${BOLD}menv${NC} - Development Environment Manager
-
-${CYAN}Usage:${NC}
-    menv <command>
-
-${CYAN}Commands:${NC}
-    ${GREEN}init${NC}    Clone all repositories
-    ${GREEN}pull${NC}   Pull all repositories (including menv itself)
-    ${GREEN}list${NC}   List all repositories
-    ${GREEN}link${NC}   Execute link.sh in all repositories
-    ${GREEN}doctor${NC} Check required tools
-
-${CYAN}Examples:${NC}
-    menv init
-    menv pull
-    menv list
-    menv link
-    menv doctor
-EOF
+    echo
+    echo -e "${BOLD}menv${NC} - Development Environment Manager"
+    echo
+    echo -e "${CYAN}Usage:${NC}"
+    echo "    menv <command>"
+    echo
+    echo -e "${CYAN}Commands:${NC}"
+    echo -e "    ${GREEN}init${NC}    Clone all repositories"
+    echo -e "    ${GREEN}pull${NC}   Pull all repositories (including menv itself)"
+    echo -e "    ${GREEN}list${NC}   List all repositories"
+    echo -e "    ${GREEN}link${NC}   Execute link.sh in all repositories"
+    echo -e "    ${GREEN}doctor${NC} Check required tools"
+    echo
+    echo -e "${CYAN}Examples:${NC}"
+    echo "    menv init"
+    echo "    menv pull"
+    echo "    menv list"
+    echo "    menv link"
+    echo "    menv doctor"
 }
 
 main() {
