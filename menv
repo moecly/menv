@@ -40,19 +40,20 @@ REQUIRED_TOOLS=(
     "zsh:zsh"
     "nvim:nvim"
     "tmux:tmux"
+    "openssh:ssh"
+)
+
+OPTIONAL_TOOLS=(
     "npm:npm"
     "unzip:unzip"
     "python3:python3"
     "python3-pip:pip3"
     "python3-pipx:pipx"
     "gcc:gcc"
-    "openssh:ssh"
-    "nodejs:nodejs node"
-)
-
-OPTIONAL_TOOLS=(
     "timeshift:timeshift"
     "snap-pac:"
+    "nodejs:nodejs node"
+    "opencode:opencode"
 )
 
 check_base_dir() {
