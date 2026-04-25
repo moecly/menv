@@ -54,6 +54,9 @@ OPTIONAL_TOOLS=(
     "snap-pac:"
     "nodejs:nodejs node"
     "opencode:opencode"
+    "niri:niri"
+    "fuzzel:fuzzel"
+    "kitty:kitty"
 )
 
 check_base_dir() {
