@@ -72,6 +72,8 @@ OPTIONAL_TOOLS=(
     "clash-verge-rev-bin:clash-verge"
     "yay:yay"
     "xwayland-satellite"
+    "tuned:tuned"
+    "ufw:ufw"
 )
 
 check_base_dir() {
