@@ -29,6 +29,9 @@ REPOS=(
     "tmux:https://github.com/moecly/tmux-config.git"
     "zsh:https://github.com/moecly/zsh-config.git"
     "nvim:https://github.com/moecly/nvim-config.git"
+    "alacritty:https://github.com/moecly/alacritty-config.git"
+    "keyd:https://github.com/moecly/keyd-config.git"
+    "niri:https://github.com/moecly/niri-config.git"
 )
 
 REQUIRED_TOOLS=(
