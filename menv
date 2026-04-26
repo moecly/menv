@@ -60,6 +60,12 @@ OPTIONAL_TOOLS=(
     "niri:niri"
     "fuzzel:fuzzel"
     "kitty:kitty"
+    "ttf-0xproto-nerd:"
+    "fcitx5:fcitx5"
+    "keyd:keyd"
+    "dms-shell-niri:dms"
+    "alacritt-theme-git:"
+    "keepassxc:keepassxc"
 )
 
 check_base_dir() {
