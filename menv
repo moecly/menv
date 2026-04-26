@@ -54,6 +54,7 @@ OPTIONAL_TOOLS=(
     "python3-pipx:pipx"
     "gcc:gcc"
     "timeshift:timeshift"
+    "snapper:snapper"
     "snap-pac:"
     "nodejs:nodejs node"
     "opencode:opencode"
