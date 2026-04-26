@@ -66,6 +66,10 @@ OPTIONAL_TOOLS=(
     "dms-shell-niri:dms"
     "alacritt-theme-git:"
     "keepassxc:keepassxc"
+    "localsend-bin:localsend"
+    "chromium:chromium"
+    "clash-verge-rev-bin:clash-verge"
+    "yay:yay"
 )
 
 check_base_dir() {
