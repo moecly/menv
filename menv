@@ -71,6 +71,7 @@ OPTIONAL_TOOLS=(
     "chromium:chromium"
     "clash-verge-rev-bin:clash-verge"
     "yay:yay"
+    "xwayland-satellite"
 )
 
 check_base_dir() {
