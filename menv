@@ -42,48 +42,49 @@ REPOS=(
     "alacritty:https://github.com/moecly/alacritty-config.git"
     "keyd:https://github.com/moecly/keyd-config.git"
     "niri:https://github.com/moecly/niri-config.git"
+    "kitty:https://github.com/moecly/kitty-config.git"
 )
 
 REQUIRED_TOOLS=(
-    "git:git"
-    "lazygit:lazygit"
-    "fd:fd fdfind"
-    "ripgrep:rg"
-    "fzf:fzf"
-    "zsh:zsh"
-    "nvim:nvim"
-    "tmux:tmux"
-    "openssh:ssh"
+    "git:git:版本控制"
+    "lazygit:lazygit:TUI Git 客户端"
+    "fd:fd fdfind:快速文件搜索"
+    "ripgrep:rg:快速代码搜索"
+    "fzf:fzf:模糊查找工具"
+    "zsh:zsh:Shell"
+    "nvim:nvim:文本编辑器"
+    "tmux:tmux:终端复用器"
+    "openssh:ssh:SSH 客户端"
 )
 
 OPTIONAL_TOOLS=(
-    "npm:npm"
-    "unzip:unzip"
-    "python3:python3"
-    "python3-pip:pip3"
-    "python3-pipx:pipx"
-    "gcc:gcc"
-    "timeshift:timeshift"
-    "snapper:snapper"
-    "snap-pac:"
-    "nodejs:nodejs node"
-    "opencode:opencode"
-    "niri:niri"
-    "fuzzel:fuzzel"
-    "kitty:kitty"
-    "ttf-0xproto-nerd:"
-    "fcitx5:fcitx5"
-    "keyd:keyd"
-    "dms-shell-niri:dms"
-    "alacritt-theme-git:"
-    "keepassxc:keepassxc"
-    "localsend-bin:localsend"
-    "chromium:chromium"
-    "clash-verge-rev-bin:clash-verge"
-    "yay:yay"
-    "xwayland-satellite"
-    "tuned:tuned"
-    "ufw:ufw"
+    "npm:npm:Node.js 包管理器"
+    "unzip:unzip:解压缩工具"
+    "python3:python3:Python 解释器"
+    "python3-pip:pip3:Python 包管理器"
+    "python3-pipx:pipx:Python 应用隔离安装"
+    "gcc:gcc:C/C++ 编译器"
+    "timeshift:timeshift:系统快照工具"
+    "snapper:snapper:Btrfs 快照工具"
+    "snap-pac::Pacman 钩子自动快照"
+    "nodejs:nodejs node:JavaScript 运行时"
+    "opencode:opencode:AI 编程助手"
+    "niri:niri:Wayland 合成器"
+    "fuzzel:fuzzel:Wayland 应用启动器"
+    "kitty:kitty:GPU 加速终端"
+    "ttf-0xproto-nerd::等宽字体"
+    "fcitx5:fcitx5:输入法框架"
+    "keyd:keyd:键盘重映射工具"
+    "dms-shell-niri:dms:动态菜单"
+    "alacritt-theme-git::Alacritty 主题"
+    "keepassxc:keepassxc:密码管理器"
+    "localsend-bin:localsend:局域网文件传输"
+    "chromium:chromium:网页浏览器"
+    "clash-verge-rev-bin:clash-verge:代理客户端"
+    "yay:yay:AUR 包管理器"
+    "xwayland-satellite::XWayland 兼容层"
+    "tuned:tuned:系统调优守护进程"
+    "ufw:ufw:防火墙"
 )
 
 check_base_dir() {
@@ -167,19 +168,25 @@ cmd_doctor() {
     echo -e "${BOLD}Required:${NC}"
     local req_width=$(get_max_name_length "${REQUIRED_TOOLS[@]}")
     for tool in "${REQUIRED_TOOLS[@]}"; do
-        name="${tool%%:*}"
-        cmds="${tool#*:}"
+        IFS=: read -r name cmds desc <<< "$tool"
         found=0
-        for cmd in $cmds; do
-            if command -v "$cmd" >/dev/null 2>&1; then
-                found=1
-                break
-            fi
-        done
+        if [[ -n "$cmds" ]]; then
+            for cmd in $cmds; do
+                if command -v "$cmd" >/dev/null 2>&1; then
+                    found=1
+                    break
+                fi
+            done
+        fi
         if [[ $found -eq 1 ]]; then
-            printf "  ${GREEN}✓${NC}  %-${req_width}s ${GREEN}found${NC}\n" "$name"
+            printf "  ${GREEN}✓${NC}  %-${req_width}s ${GREEN}found${NC}" "$name"
         else
-            printf "  ${RED}✗${NC}  %-${req_width}s ${RED}not found${NC}\n" "$name"
+            printf "  ${RED}✗${NC}  %-${req_width}s ${RED}not found${NC}" "$name"
+        fi
+        if [[ -n "$desc" ]]; then
+            echo -e " ${CYAN}($desc)${NC}"
+        else
+            echo
         fi
     done
 
@@ -187,10 +194,9 @@ cmd_doctor() {
     echo -e "${BOLD}Optional:${NC}"
     local opt_width=$(get_max_name_length "${OPTIONAL_TOOLS[@]}")
     for tool in "${OPTIONAL_TOOLS[@]}"; do
-        name="${tool%%:*}"
-        cmds="${tool#*:}"
+        IFS=: read -r name cmds desc <<< "$tool"
         if [[ -z "$cmds" ]]; then
-            printf "  ${YELLOW}?${NC}  %-${opt_width}s ${YELLOW}skip${NC}\n" "$name"
+            printf "  ${YELLOW}?${NC}  %-${opt_width}s ${YELLOW}skip${NC}" "$name"
         else
             found=0
             for cmd in $cmds; do
@@ -200,10 +206,15 @@ cmd_doctor() {
                 fi
             done
             if [[ $found -eq 1 ]]; then
-                printf "  ${GREEN}✓${NC}  %-${opt_width}s ${GREEN}found${NC}\n" "$name"
+                printf "  ${GREEN}✓${NC}  %-${opt_width}s ${GREEN}found${NC}" "$name"
             else
-                printf "  ${YELLOW}⚠${NC}  %-${opt_width}s ${YELLOW}not found${NC}\n" "$name"
+                printf "  ${YELLOW}⚠${NC}  %-${opt_width}s ${YELLOW}not found${NC}" "$name"
             fi
+        fi
+        if [[ -n "$desc" ]]; then
+            echo -e " ${CYAN}($desc)${NC}"
+        else
+            echo
         fi
     done
     div
