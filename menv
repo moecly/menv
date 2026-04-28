@@ -44,6 +44,7 @@ REPOS=(
     "niri:https://github.com/moecly/niri-config.git"
     "kitty:https://github.com/moecly/kitty-config.git"
     "swaylock:https://github.com/moecly/swaylock-config.git"
+    "fuzzel:https://github.com/moecly/fuzzel-config.git"
 )
 
 REQUIRED_TOOLS=(
