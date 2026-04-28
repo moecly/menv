@@ -55,7 +55,18 @@ REQUIRED_TOOLS=(
     "zsh:zsh:Shell"
     "nvim:nvim:文本编辑器"
     "tmux:tmux:终端复用器"
-    "openssh:ssh:SSH 客户端"
+    "eza:eza:现代的 ls 替代品"
+    "trash-cli:trash:回收站工具"
+    "zoxide:zoxide:快速目录导航工具"
+    "git-delta:delta:Git 差异查看工具"
+    "procs:procs:进程查看工具"
+    "xh:xh:现代的 HTTP 客户端"
+    "gping:gping:Ping 工具"
+    "btop:btop:系统监控工具"
+    "dust:dust:磁盘使用情况分析工具"
+    "duf:duf:磁盘使用情况分析工具"
+    "bat:bat:语法高亮的 cat 工具"
+    "ouch:ouch:压缩工具"
 )
 
 OPTIONAL_TOOLS=(
@@ -87,6 +98,7 @@ OPTIONAL_TOOLS=(
     "tuned:tuned:系统调优守护进程"
     "ufw:ufw:防火墙"
     "lutris:lutris:Linux 游戏平台"
+    "openssh:ssh:SSH 客户端"
 )
 
 check_base_dir() {
