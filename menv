@@ -86,6 +86,7 @@ OPTIONAL_TOOLS=(
     "xwayland-satellite::XWayland 兼容层"
     "tuned:tuned:系统调优守护进程"
     "ufw:ufw:防火墙"
+    "lutris:lutris:Linux 游戏平台"
 )
 
 check_base_dir() {
