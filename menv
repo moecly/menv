@@ -68,6 +68,7 @@ REQUIRED_TOOLS=(
     "duf:duf:磁盘使用情况分析工具"
     "bat:bat:语法高亮的 cat 工具"
     "ouch:ouch:压缩工具"
+    "tldr:tldr:简化版的 man 页面"
 )
 
 OPTIONAL_TOOLS=(
