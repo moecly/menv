@@ -102,6 +102,7 @@ OPTIONAL_TOOLS=(
     "ouch:ouch:压缩工具"
     "tldr:tldr:简化版的 man 页面"
     "ncdu:ncdu:磁盘使用情况分析工具"
+    "plocate:plocate:快速文件搜索工具"
 )
 
 check_base_dir() {
