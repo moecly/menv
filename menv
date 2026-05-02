@@ -116,6 +116,7 @@ OPTIONAL_TOOLS=(
     "okular:okular:文档查看器"
     "libreoffice:libreoffice:办公套件"
     "winboat::Windows 兼容层"
+    "freedownloadmanager:fdm:多协议的下载加速工具"
 )
 
 check_base_dir() {
