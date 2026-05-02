@@ -45,6 +45,7 @@ REPOS=(
     "kitty:https://github.com/moecly/kitty-config.git"
     "swaylock:https://github.com/moecly/swaylock-config.git"
     "fuzzel:https://github.com/moecly/fuzzel-config.git"
+    "fontconfig:https://github.com/moecly/fontconfig-config.git"
 )
 
 REQUIRED_TOOLS=(
@@ -86,7 +87,7 @@ OPTIONAL_TOOLS=(
     "chromium:chromium:网页浏览器"
     "clash-verge-rev-bin:clash-verge:代理客户端"
     "yay:yay:AUR 包管理器"
-    "xwayland-satellite::XWayland 兼容层"
+    "xwayland-satellite:xwayland-satellite:XWayland 兼容层"
     "tuned:tuned:系统调优守护进程"
     "ufw:ufw:防火墙"
     "lutris:lutris:Linux 游戏平台"
@@ -103,6 +104,15 @@ OPTIONAL_TOOLS=(
     "tldr:tldr:简化版的 man 页面"
     "ncdu:ncdu:磁盘使用情况分析工具"
     "plocate:plocate:快速文件搜索工具"
+    "noto-fonts-cjk::Google Noto CJK 字体"
+    "fcitx5:fcitx5:输入法框架"
+    "fcitx5-qt::输入法框架 Qt 插件"
+    "fcitx5-gtk::输入法框架 GTK 插件"
+    "fcitx5-configtool:fcitx5-configtool:输入法框架配置工具"
+    "fcitx5-chinese-addons::输入法框架中文插件"
+    "ntfs-3g:ntfs-3g:NTFS 文件系统支持"
+    "cava:cava:音频可视化工具"
+    "virtualbox:virtualbox:虚拟机软件"
 )
 
 check_base_dir() {
