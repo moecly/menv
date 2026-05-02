@@ -115,6 +115,7 @@ OPTIONAL_TOOLS=(
     "virtualbox:virtualbox:虚拟机软件"
     "okular:okular:文档查看器"
     "libreoffice:libreoffice:办公套件"
+    "winboat::Windows 兼容层"
 )
 
 check_base_dir() {
