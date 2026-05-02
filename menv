@@ -117,6 +117,8 @@ OPTIONAL_TOOLS=(
     "libreoffice:libreoffice:办公套件"
     "winboat::Windows 兼容层"
     "freedownloadmanager:fdm:多协议的下载加速工具"
+    "polkit::Polkit 权限管理工具"
+    "polkit-kde-agent::Polkit 权限管理工具"
 )
 
 check_base_dir() {
