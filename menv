@@ -120,6 +120,7 @@ OPTIONAL_TOOLS=(
     "polkit::Polkit 权限管理工具"
     "polkit-kde-agent::Polkit 权限管理工具"
     "kdiskmark:kdiskmark:磁盘性能测试工具"
+    "wlogout:wlogout:Wayland 锁屏工具"
 )
 
 check_base_dir() {
