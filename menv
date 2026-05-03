@@ -46,6 +46,7 @@ REPOS=(
     "swaylock:https://github.com/moecly/swaylock-config.git"
     "fuzzel:https://github.com/moecly/fuzzel-config.git"
     "fontconfig:https://github.com/moecly/fontconfig-config.git"
+    "wlogout:https://github.com/moecly/wlogout-config.git"
 )
 
 REQUIRED_TOOLS=(
