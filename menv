@@ -55,6 +55,25 @@ get_max_name_length() {
     echo $max_len
 }
 
+convert_url() {
+    local url="$1"
+    local protocol="$2"
+
+    # GitHub HTTPS → SSH
+    if [[ "$protocol" == "ssh" && "$url" =~ ^https://github\.com/(.*)$ ]]; then
+        local path="${BASH_REMATCH[1]}"
+        path="${path/\//:}"
+        echo "git@github.com:$path"
+    # GitHub SSH → HTTPS
+    elif [[ "$protocol" == "https" && "$url" =~ ^git@github\.com:(.*)$ ]]; then
+        local path="${BASH_REMATCH[1]}"
+        echo "https://github.com/$path"
+    # 其他情况返回原 URL
+    else
+        echo "$url"
+    fi
+}
+
 check_installed() {
     local source="$1"
     local name="$2"
