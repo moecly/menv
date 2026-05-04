@@ -12,32 +12,54 @@ if [ -z "$1" ]; then
 fi
 
 SIZE_GB="$1"
-SIZE_MB=$((SIZE_GB * 1024))
-SWAPFILE="/swapfile"
+SWAP_SUBVOL="/swap"
+SWAPFILE="${SWAP_SUBVOL}/swapfile"
+FSTAB_ENTRY="${SWAPFILE} none swap defaults 0 0"
 
-echo "==> Creating ${SIZE_GB}GB (${SIZE_MB}MB) swap file..."
+echo "==> Creating ${SIZE_GB}GB swap file in dedicated subvolume..."
 
-echo "==> 1/5 Deactivating old swap file..."
-sudo swapoff "$SWAPFILE" 2>/dev/null || true
+echo "==> 1/5 Deactivating old swap files..."
+# 关闭所有 swap，处理可能的旧文件
+sudo swapoff -a 2>/dev/null || true
 
-if [ -f "$SWAPFILE" ]; then
-    echo "==> Removing old file..."
-    sudo rm -f "$SWAPFILE"
+# 删除旧的 /swapfile（如果存在）
+if [ -f "/swapfile" ]; then
+    echo "    Removing old /swapfile..."
+    sudo rm -f /swapfile
 fi
 
-echo "==> 2/5 Creating new file and disabling CoW..."
-sudo touch "$SWAPFILE"
-sudo chattr +C "$SWAPFILE"
+# 如果旧子卷存在，先删除
+if sudo btrfs subvolume list / | grep -q "path ${SWAP_SUBVOL#/}$"; then
+    echo "    Removing old swap subvolume..."
+    sudo btrfs subvolume delete "$SWAP_SUBVOL"
+fi
 
-echo "==> 3/5 Writing ${SIZE_GB}GB of data (may take a few minutes)..."
-sudo dd if=/dev/zero of="$SWAPFILE" bs=1M count="$SIZE_MB" status=progress
+echo "==> 2/5 Creating dedicated @swap subvolume..."
+sudo btrfs subvolume create "$SWAP_SUBVOL"
 
-echo "==> 4/5 Setting permissions and formatting..."
+echo "==> 3/5 Creating ${SIZE_GB}GB swap file with Btrfs native method..."
+sudo btrfs filesystem mkswapfile --size "${SIZE_GB}G" "$SWAPFILE"
+
+echo "==> 4/5 Setting permissions..."
 sudo chmod 600 "$SWAPFILE"
-sudo mkswap "$SWAPFILE"
 
 echo "==> 5/5 Enabling swap..."
 sudo swapon "$SWAPFILE"
 
-echo "==> Done! Current swap status:"
+echo "==> Updating /etc/fstab..."
+# 先移除旧的 swap 条目
+sudo sed -i '/swap/d' /etc/fstab
+# 添加新的
+echo "$FSTAB_ENTRY" | sudo tee -a /etc/fstab
+
+echo ""
+echo "==> Done! Summary:"
+echo "    Swap size: ${SIZE_GB}GB"
+echo "    Location:  ${SWAPFILE}"
+echo "    Subvolume: ${SWAP_SUBVOL}"
+echo ""
+echo "Current swap status:"
 swapon --show
+echo ""
+echo "Subvolume layout:"
+sudo btrfs subvolume list / | grep swap
