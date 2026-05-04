@@ -201,6 +201,9 @@ cmd_doctor() {
     echo -e "${BOLD}  ⚙  Checking tools...${NC}"
     div
 
+    local missing_required=()
+    local missing_optional=()
+
     echo -e "${BOLD}Required:${NC}"
     local req_width=$(get_max_name_length "${REQUIRED_TOOLS[@]}")
     for tool in "${REQUIRED_TOOLS[@]}"; do
@@ -218,6 +221,7 @@ cmd_doctor() {
             printf "  ${GREEN}✓${NC}  %-${req_width}s ${GREEN}found${NC}" "$name"
         else
             printf "  ${RED}✗${NC}  %-${req_width}s ${RED}not found${NC}" "$name"
+            missing_required+=("$name:$desc")
         fi
         if [[ -n "$desc" ]]; then
             echo -e " ${CYAN}($desc)${NC}"
@@ -245,6 +249,7 @@ cmd_doctor() {
                 printf "  ${GREEN}✓${NC}  %-${opt_width}s ${GREEN}found${NC}" "$name"
             else
                 printf "  ${YELLOW}⚠${NC}  %-${opt_width}s ${YELLOW}not found${NC}" "$name"
+                missing_optional+=("$name:$desc")
             fi
         fi
         if [[ -n "$desc" ]]; then
@@ -253,6 +258,40 @@ cmd_doctor() {
             echo
         fi
     done
+
+    echo
+    div
+    echo -e "${BOLD}  Summary${NC}"
+    div
+
+    echo -e "${BOLD}Missing Required:${NC}"
+    if [[ ${#missing_required[@]} -eq 0 ]]; then
+        echo -e "  ${GREEN}✓ All installed${NC}"
+    else
+        for tool in "${missing_required[@]}"; do
+            IFS=: read -r name desc <<< "$tool"
+            if [[ -n "$desc" ]]; then
+                echo -e "  ${RED}✗${NC} $name ${CYAN}($desc)${NC}"
+            else
+                echo -e "  ${RED}✗${NC} $name"
+            fi
+        done
+    fi
+
+    echo
+    echo -e "${BOLD}Missing Optional:${NC}"
+    if [[ ${#missing_optional[@]} -eq 0 ]]; then
+        echo -e "  ${GREEN}✓ All installed${NC}"
+    else
+        for tool in "${missing_optional[@]}"; do
+            IFS=: read -r name desc <<< "$tool"
+            if [[ -n "$desc" ]]; then
+                echo -e "  ${YELLOW}⚠${NC} $name ${CYAN}($desc)${NC}"
+            else
+                echo -e "  ${YELLOW}⚠${NC} $name"
+            fi
+        done
+    fi
     div
 }
 
