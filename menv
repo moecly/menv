@@ -394,6 +394,62 @@ cmd_protocol() {
     div
 }
 
+cmd_run() {
+    local target="$1"
+    shift || true
+
+    if [[ "$target" == "--list" || "$target" == "-l" || -z "$target" ]]; then
+        echo
+        div
+        echo -e "${BOLD}  Available Scripts${NC}"
+        div
+        local max_len=0
+        for entry in "${SCRIPTS[@]}"; do
+            IFS=: read -r alias _ _ <<< "$entry"
+            local len=${#alias}
+            ((len > max_len)) && max_len=$len
+        done
+        for entry in "${SCRIPTS[@]}"; do
+            IFS=: read -r alias filename desc <<< "$entry"
+            printf "  ${GREEN}%-*s${NC} %s\n" "$max_len" "$alias" "$desc"
+        done
+        div
+        return
+    fi
+
+    local resolved_file=""
+    local resolved_desc=""
+    for entry in "${SCRIPTS[@]}"; do
+        IFS=: read -r alias filename desc <<< "$entry"
+        if [[ "$target" == "$alias" ]]; then
+            resolved_file="$filename"
+            resolved_desc="$desc"
+            break
+        fi
+    done
+
+    if [[ -z "$resolved_file" ]]; then
+        echo -e "${RED}Error: Unknown script '$target'${NC}"
+        echo -e "Run ${CYAN}menv run --list${NC} to see available scripts"
+        return 1
+    fi
+
+    local script_path="$SCRIPT_DIR/sh/$resolved_file"
+    if [[ ! -f "$script_path" ]]; then
+        echo -e "${RED}Error: Script file not found: $script_path${NC}"
+        return 1
+    fi
+
+    echo
+    div
+    echo -e "${BOLD}  ▶  Running $resolved_desc${NC}"
+    div
+    bash "$script_path" "$@"
+    local exit_code=$?
+    div
+    return $exit_code
+}
+
 show_help() {
     echo
     echo -e "${BOLD}menv${NC} - Development Environment Manager"
@@ -408,6 +464,7 @@ show_help() {
     echo -e "    ${GREEN}link${NC}     Execute link.sh in all repositories"
     echo -e "    ${GREEN}doctor${NC}   Check required and optional tools"
     echo -e "    ${GREEN}install${NC}  Install missing tools (pacman + AUR)"
+    echo -e "    ${GREEN}run${NC}       Run setup scripts from sh/ directory"
     echo -e "    ${GREEN}protocol${NC}  Switch clone protocol (https|ssh)"
     echo
     echo -e "${CYAN}Examples:${NC}"
@@ -419,6 +476,9 @@ show_help() {
     echo "    menv install"
     echo "    menv install cli"
     echo "    menv install --list"
+    echo "    menv run"
+    echo "    menv run paru"
+    echo "    menv run swapfile 24"
     echo "    menv protocol ssh"
 }
 
@@ -432,6 +492,7 @@ main() {
         link)   cmd_link ;;
         doctor) cmd_doctor ;;
         install) cmd_install "$@" ;;
+        run)     cmd_run "$@" ;;
         protocol) cmd_protocol "$@" ;;
         help|--help|-h) show_help ;;
         "")
