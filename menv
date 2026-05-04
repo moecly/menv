@@ -50,77 +50,107 @@ REPOS=(
 )
 
 REQUIRED_TOOLS=(
-    "git:git:版本控制"
-    "lazygit:lazygit:TUI Git 客户端"
-    "fd:fd fdfind:快速文件搜索"
-    "ripgrep:rg:快速代码搜索"
-    "fzf:fzf:模糊查找工具"
-    "zsh:zsh:Shell"
-    "nvim:nvim:文本编辑器"
-    "tmux:tmux:终端复用器"
-    "eza:eza:现代的 ls 替代品"
-    "trash-cli:trash:回收站工具"
-    "zoxide:zoxide:快速目录导航工具"
+    "git:git:版本控制:pacman"
+    "fd:fd fdfind:快速文件搜索:pacman"
+    "ripgrep:rg:快速代码搜索:pacman"
+    "fzf:fzf:模糊查找工具:pacman"
 )
 
-OPTIONAL_TOOLS=(
-    "npm:npm:Node.js 包管理器"
-    "unzip:unzip:解压缩工具"
-    "python3:python3:Python 解释器"
-    "python3-pip:pip3:Python 包管理器"
-    "python3-pipx:pipx:Python 应用隔离安装"
-    "gcc:gcc:C/C++ 编译器"
-    "timeshift:timeshift:系统快照工具"
-    "snapper:snapper:Btrfs 快照工具"
-    "snap-pac::Pacman 钩子自动快照"
-    "nodejs:nodejs node:JavaScript 运行时"
-    "opencode:opencode:AI 编程助手"
-    "niri:niri:Wayland 合成器"
-    "fuzzel:fuzzel:Wayland 应用启动器"
-    "kitty:kitty:GPU 加速终端"
-    "ttf-0xproto-nerd::等宽字体"
-    "keyd:keyd:键盘重映射工具"
-    "dms-shell-niri:dms:动态菜单"
-    "alacritty-theme-git::Alacritty 主题"
-    "keepassxc:keepassxc:密码管理器"
-    "localsend-bin:localsend:局域网文件传输"
-    "chromium:chromium:网页浏览器"
-    "clash-verge-rev-bin:clash-verge:代理客户端"
-    "paru:paru:AUR 包管理器"
-    "xwayland-satellite:xwayland-satellite:XWayland 兼容层"
-    "tuned:tuned:系统调优守护进程"
-    "ufw:ufw:防火墙"
-    "lutris:lutris:Linux 游戏平台"
-    "openssh:ssh:SSH 客户端"
-    "git-delta:delta:Git 差异查看工具"
-    "procs:procs:进程查看工具"
-    "xh:xh:现代的 HTTP 客户端"
-    "gping:gping:Ping 工具"
-    "btop:btop:系统监控工具"
-    "dust:dust:磁盘使用情况分析工具"
-    "duf:duf:磁盘使用情况分析工具"
-    "bat:bat:语法高亮的 cat 工具"
-    "ouch:ouch:压缩工具"
-    "tldr:tldr:简化版的 man 页面"
-    "ncdu:ncdu:磁盘使用情况分析工具"
-    "plocate:plocate:快速文件搜索工具"
-    "noto-fonts-cjk::Google Noto CJK 字体"
-    "fcitx5:fcitx5:输入法框架"
-    "fcitx5-qt::输入法框架 Qt 插件"
-    "fcitx5-gtk::输入法框架 GTK 插件"
-    "fcitx5-configtool:fcitx5-configtool:输入法框架配置工具"
-    "fcitx5-chinese-addons::输入法框架中文插件"
-    "ntfs-3g:ntfs-3g:NTFS 文件系统支持"
-    "cava:cava:音频可视化工具"
-    "virtualbox:virtualbox:虚拟机软件"
-    "okular:okular:文档查看器"
-    "libreoffice:libreoffice:办公套件"
-    "winboat::Windows 兼容层"
-    "freedownloadmanager:fdm:多协议的下载加速工具"
-    "polkit::Polkit 权限管理工具"
-    "polkit-kde-agent::Polkit 权限管理工具"
-    "kdiskmark:kdiskmark:磁盘性能测试工具"
-    "wlogout:wlogout:Wayland 锁屏工具"
+REQUIRED_SHELL_TERMINAL=(
+    "zsh:zsh:Shell:pacman"
+    "tmux:tmux:终端复用器:pacman"
+    "nvim:nvim:文本编辑器:pacman"
+)
+
+REQUIRED_FILE_MANAGEMENT=(
+    "eza:eza:现代的 ls 替代品:pacman"
+    "trash-cli:trash:回收站工具:pacman"
+    "zoxide:zoxide:快速目录导航工具:pacman"
+)
+
+REQUIRED_TUI_CLIENTS=(
+    "lazygit:lazygit:TUI Git 客户端:pacman"
+)
+
+OPTIONAL_PACKAGE_MANAGERS=(
+    "npm:npm:Node.js 包管理器:pacman"
+    "nodejs:nodejs node:JavaScript 运行时:pacman"
+    "python:python3:Python 解释器:pacman"
+    "python-pip:pip3:Python 包管理器:pacman"
+    "python-pipx:pipx:Python 应用隔离安装:pacman"
+    "gcc:gcc:C/C++ 编译器:pacman"
+    "paru:paru:AUR 包管理器:aur"
+)
+
+OPTIONAL_WAYLAND_DESKTOP=(
+    "niri:niri:Wayland 合成器:pacman"
+    "fuzzel:fuzzel:Wayland 应用启动器:pacman"
+    "kitty:kitty:GPU 加速终端:pacman"
+    "xwayland-satellite:xwayland-satellite:XWayland 兼容层:pacman"
+    "wlogout:wlogout:Wayland 锁屏工具:aur"
+)
+
+OPTIONAL_INPUT_METHOD_FONTS=(
+    "fcitx5:fcitx5:输入法框架:pacman"
+    "fcitx5-qt::输入法框架 Qt 插件:pacman"
+    "fcitx5-gtk::输入法框架 GTK 插件:pacman"
+    "fcitx5-configtool:fcitx5-configtool:输入法框架配置工具:pacman"
+    "fcitx5-chinese-addons::输入法框架中文插件:pacman"
+    "noto-fonts-cjk::Google Noto CJK 字体:pacman"
+    "ttf-0xproto-nerd::等宽字体:pacman"
+)
+
+OPTIONAL_CLI_ENHANCEMENTS=(
+    "git-delta:delta:Git 差异查看工具:pacman"
+    "procs:procs:进程查看工具:pacman"
+    "xh:xh:现代的 HTTP 客户端:pacman"
+    "gping:gping:Ping 工具:pacman"
+    "btop:btop:系统监控工具:pacman"
+    "dust:dust:磁盘使用情况分析工具:pacman"
+    "duf:duf:磁盘使用情况分析工具:pacman"
+    "bat:bat:语法高亮的 cat 工具:pacman"
+    "ouch:ouch:压缩工具:pacman"
+    "tldr:tldr:简化版的 man 页面:pacman"
+    "ncdu:ncdu:磁盘使用情况分析工具:pacman"
+    "plocate:plocate:快速文件搜索工具:pacman"
+    "cava:cava:音频可视化工具:pacman"
+    "unzip:unzip:解压缩工具:pacman"
+)
+
+OPTIONAL_NETWORK_SECURITY=(
+    "openssh:ssh:SSH 客户端:pacman"
+    "chromium:chromium:网页浏览器:pacman"
+    "clash-verge-rev-bin:clash-verge:代理客户端:aur"
+    "localsend-bin:localsend:局域网文件传输:aur"
+    "ufw:ufw:防火墙:pacman"
+    "tuned:tuned:系统调优守护进程:pacman"
+    "keepassxc:keepassxc:密码管理器:pacman"
+)
+
+OPTIONAL_SYSTEM_MANAGEMENT=(
+    "timeshift:timeshift:系统快照工具:pacman"
+    "snapper:snapper:Btrfs 快照工具:pacman"
+    "snap-pac::Pacman 钩子自动快照:pacman"
+    "ntfs-3g:ntfs-3g:NTFS 文件系统支持:pacman"
+    "kdiskmark:kdiskmark:磁盘性能测试工具:pacman"
+    "keyd:keyd:键盘重映射工具:pacman"
+    "polkit::Polkit 权限管理工具:pacman"
+    "polkit-kde-agent::Polkit 权限管理工具:pacman"
+)
+
+OPTIONAL_PRODUCTIVITY_ENTERTAINMENT=(
+    "libreoffice:libreoffice:办公套件:pacman"
+    "okular:okular:文档查看器:pacman"
+    "virtualbox:virtualbox:虚拟机软件:pacman"
+    "winboat::Windows 兼容层:aur"
+    "lutris:lutris:Linux 游戏平台:pacman"
+    "freedownloadmanager:fdm:多协议的下载加速工具:aur"
+)
+
+OPTIONAL_OTHER=(
+    "alacritty-theme-git::Alacritty 主题:aur"
+    "dms-shell-niri:dms:动态菜单:pacman"
+    "opencode:opencode:AI 编程助手:pacman"
 )
 
 check_base_dir() {
@@ -204,60 +234,62 @@ cmd_doctor() {
     local missing_required=()
     local missing_optional=()
 
-    echo -e "${BOLD}Required:${NC}"
-    local req_width=$(get_max_name_length "${REQUIRED_TOOLS[@]}")
-    for tool in "${REQUIRED_TOOLS[@]}"; do
-        IFS=: read -r name cmds desc <<< "$tool"
-        found=0
-        if [[ -n "$cmds" ]]; then
-            for cmd in $cmds; do
-                if command -v "$cmd" >/dev/null 2>&1; then
-                    found=1
-                    break
-                fi
-            done
+    check_category() {
+        local label="$1"
+        shift
+        local tools=("$@")
+        local max_width=$(get_max_name_length "${tools[@]}")
+        local is_optional=0
+        if [[ "$label" == Optional:* ]]; then
+            is_optional=1
         fi
-        if [[ $found -eq 1 ]]; then
-            printf "  ${GREEN}✓${NC}  %-${req_width}s ${GREEN}found${NC}" "$name"
-        else
-            printf "  ${RED}✗${NC}  %-${req_width}s ${RED}not found${NC}" "$name"
-            missing_required+=("$name:$desc")
-        fi
-        if [[ -n "$desc" ]]; then
-            echo -e " ${CYAN}($desc)${NC}"
-        else
-            echo
-        fi
-    done
 
-    echo
-    echo -e "${BOLD}Optional:${NC}"
-    local opt_width=$(get_max_name_length "${OPTIONAL_TOOLS[@]}")
-    for tool in "${OPTIONAL_TOOLS[@]}"; do
-        IFS=: read -r name cmds desc <<< "$tool"
-        if [[ -z "$cmds" ]]; then
-            printf "  ${YELLOW}?${NC}  %-${opt_width}s ${YELLOW}skip${NC}" "$name"
-        else
-            found=0
-            for cmd in $cmds; do
-                if command -v "$cmd" >/dev/null 2>&1; then
-                    found=1
-                    break
-                fi
-            done
-            if [[ $found -eq 1 ]]; then
-                printf "  ${GREEN}✓${NC}  %-${opt_width}s ${GREEN}found${NC}" "$name"
+        echo -e "${BOLD}$label:${NC}"
+        for tool in "${tools[@]}"; do
+            IFS=: read -r name cmds desc source <<< "$tool"
+            local found=0
+            if [[ -z "$cmds" ]]; then
+                printf "  ${YELLOW}?${NC}  %-${max_width}s ${YELLOW}skip${NC}" "$name"
             else
-                printf "  ${YELLOW}⚠${NC}  %-${opt_width}s ${YELLOW}not found${NC}" "$name"
-                missing_optional+=("$name:$desc")
+                for cmd in $cmds; do
+                    if command -v "$cmd" >/dev/null 2>&1; then
+                        found=1
+                        break
+                    fi
+                done
+                if [[ $found -eq 1 ]]; then
+                    printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
+                else
+                    if [[ $is_optional -eq 1 ]]; then
+                        printf "  ${YELLOW}⚠${NC}  %-${max_width}s ${YELLOW}not found${NC}" "$name"
+                        missing_optional+=("$name:$desc:$source")
+                    else
+                        printf "  ${RED}✗${NC}  %-${max_width}s ${RED}not found${NC}" "$name"
+                        missing_required+=("$name:$desc:$source")
+                    fi
+                fi
             fi
-        fi
-        if [[ -n "$desc" ]]; then
-            echo -e " ${CYAN}($desc)${NC}"
-        else
-            echo
-        fi
-    done
+            if [[ -n "$desc" ]]; then
+                echo -e " ${CYAN}($desc)${NC}"
+            else
+                echo
+            fi
+        done
+        echo
+    }
+
+    check_category "Required: 基础工具" "${REQUIRED_TOOLS[@]}"
+    check_category "Required: Shell/终端" "${REQUIRED_SHELL_TERMINAL[@]}"
+    check_category "Required: 文件管理" "${REQUIRED_FILE_MANAGEMENT[@]}"
+    check_category "Required: TUI 客户端" "${REQUIRED_TUI_CLIENTS[@]}"
+    check_category "Optional: 包管理器/语言运行时" "${OPTIONAL_PACKAGE_MANAGERS[@]}"
+    check_category "Optional: Wayland/桌面" "${OPTIONAL_WAYLAND_DESKTOP[@]}"
+    check_category "Optional: 输入法/字体" "${OPTIONAL_INPUT_METHOD_FONTS[@]}"
+    check_category "Optional: CLI 增强工具" "${OPTIONAL_CLI_ENHANCEMENTS[@]}"
+    check_category "Optional: 网络/安全" "${OPTIONAL_NETWORK_SECURITY[@]}"
+    check_category "Optional: 系统管理" "${OPTIONAL_SYSTEM_MANAGEMENT[@]}"
+    check_category "Optional: 生产力/娱乐" "${OPTIONAL_PRODUCTIVITY_ENTERTAINMENT[@]}"
+    check_category "Optional: 其他" "${OPTIONAL_OTHER[@]}"
 
     echo
     div
@@ -269,7 +301,7 @@ cmd_doctor() {
         echo -e "  ${GREEN}✓ All installed${NC}"
     else
         for tool in "${missing_required[@]}"; do
-            IFS=: read -r name desc <<< "$tool"
+            IFS=: read -r name desc source <<< "$tool"
             if [[ -n "$desc" ]]; then
                 echo -e "  ${RED}✗${NC} $name ${CYAN}($desc)${NC}"
             else
@@ -284,13 +316,140 @@ cmd_doctor() {
         echo -e "  ${GREEN}✓ All installed${NC}"
     else
         for tool in "${missing_optional[@]}"; do
-            IFS=: read -r name desc <<< "$tool"
+            IFS=: read -r name desc source <<< "$tool"
             if [[ -n "$desc" ]]; then
                 echo -e "  ${YELLOW}⚠${NC} $name ${CYAN}($desc)${NC}"
             else
                 echo -e "  ${YELLOW}⚠${NC} $name"
             fi
         done
+    fi
+    div
+}
+
+cmd_install() {
+    local target="$1"
+
+    if [[ "$target" == "--list" || "$target" == "-l" ]]; then
+        echo
+        div
+        echo -e "${BOLD}  Available Categories${NC}"
+        div
+        echo -e "  ${GREEN}base${NC}               基础工具"
+        echo -e "  ${GREEN}shell${NC}              Shell/终端"
+        echo -e "  ${GREEN}file${NC}               文件管理"
+        echo -e "  ${GREEN}tui${NC}                TUI 客户端"
+        echo -e "  ${GREEN}pkg${NC}                包管理器/语言运行时"
+        echo -e "  ${GREEN}wayland${NC}            Wayland/桌面"
+        echo -e "  ${GREEN}input${NC}              输入法/字体"
+        echo -e "  ${GREEN}cli${NC}                CLI 增强工具"
+        echo -e "  ${GREEN}net${NC}                网络/安全"
+        echo -e "  ${GREEN}system${NC}             系统管理"
+        echo -e "  ${GREEN}productivity${NC}       生产力/娱乐"
+        echo -e "  ${GREEN}other${NC}              其他"
+        div
+        return
+    fi
+
+    local pacman_pkgs=()
+    local aur_pkgs=()
+
+    resolve_alias() {
+        case "$1" in
+            base) echo "基础工具:REQUIRED_TOOLS" ;;
+            shell) echo "Shell/终端:REQUIRED_SHELL_TERMINAL" ;;
+            file) echo "文件管理:REQUIRED_FILE_MANAGEMENT" ;;
+            tui) echo "TUI 客户端:REQUIRED_TUI_CLIENTS" ;;
+            pkg) echo "包管理器/语言运行时:OPTIONAL_PACKAGE_MANAGERS" ;;
+            wayland) echo "Wayland/桌面:OPTIONAL_WAYLAND_DESKTOP" ;;
+            input) echo "输入法/字体:OPTIONAL_INPUT_METHOD_FONTS" ;;
+            cli) echo "CLI 增强工具:OPTIONAL_CLI_ENHANCEMENTS" ;;
+            net) echo "网络/安全:OPTIONAL_NETWORK_SECURITY" ;;
+            system) echo "系统管理:OPTIONAL_SYSTEM_MANAGEMENT" ;;
+            productivity) echo "生产力/娱乐:OPTIONAL_PRODUCTIVITY_ENTERTAINMENT" ;;
+            other) echo "其他:OPTIONAL_OTHER" ;;
+            *) echo "" ;;
+        esac
+    }
+
+    install_from_category() {
+        local cat_entry="$1"
+        IFS=: read -r label array_name <<< "$cat_entry"
+
+        echo -e "${BOLD}$label:${NC}"
+        local -n arr="$array_name"
+        for tool in "${arr[@]}"; do
+            IFS=: read -r name cmds desc source <<< "$tool"
+            local installed=0
+            if [[ -n "$cmds" ]]; then
+                for cmd in $cmds; do
+                    if command -v "$cmd" >/dev/null 2>&1; then
+                        installed=1
+                        break
+                    fi
+                done
+            elif pacman -Qi "$name" >/dev/null 2>&1; then
+                installed=1
+            fi
+            if [[ $installed -eq 1 ]]; then
+                echo -e "  ${GREEN}✓${NC} $name (already installed)"
+            else
+                if [[ "$source" == "aur" ]]; then
+                    echo -e "  ${YELLOW}+${NC} $name [aur]"
+                    aur_pkgs+=("$name")
+                else
+                    echo -e "  ${GREEN}+${NC} $name [pacman]"
+                    pacman_pkgs+=("$name")
+                fi
+            fi
+        done
+        echo
+    }
+
+    if [[ -n "$target" ]]; then
+        local resolved=$(resolve_alias "$target")
+        if [[ -z "$resolved" ]]; then
+            echo -e "${RED}Error: Unknown category '$target'${NC}"
+            echo -e "Run ${CYAN}menv install --list${NC} to see available categories"
+            return 1
+        fi
+        install_from_category "$resolved"
+    else
+        install_from_category "基础工具:REQUIRED_TOOLS"
+        install_from_category "Shell/终端:REQUIRED_SHELL_TERMINAL"
+        install_from_category "文件管理:REQUIRED_FILE_MANAGEMENT"
+        install_from_category "TUI 客户端:REQUIRED_TUI_CLIENTS"
+        install_from_category "包管理器/语言运行时:OPTIONAL_PACKAGE_MANAGERS"
+        install_from_category "Wayland/桌面:OPTIONAL_WAYLAND_DESKTOP"
+        install_from_category "输入法/字体:OPTIONAL_INPUT_METHOD_FONTS"
+        install_from_category "CLI 增强工具:OPTIONAL_CLI_ENHANCEMENTS"
+        install_from_category "网络/安全:OPTIONAL_NETWORK_SECURITY"
+        install_from_category "系统管理:OPTIONAL_SYSTEM_MANAGEMENT"
+        install_from_category "生产力/娱乐:OPTIONAL_PRODUCTIVITY_ENTERTAINMENT"
+        install_from_category "其他:OPTIONAL_OTHER"
+    fi
+
+    pacman_pkgs=($(printf '%s\n' "${pacman_pkgs[@]}" 2>/dev/null | sort -u))
+    aur_pkgs=($(printf '%s\n' "${aur_pkgs[@]}" 2>/dev/null | sort -u))
+
+    echo
+    div
+    if [[ ${#pacman_pkgs[@]} -gt 0 ]]; then
+        echo -e "${BOLD}Installing via pacman:${NC}"
+        echo -e "  ${GREEN}${pacman_pkgs[*]}${NC}"
+        sudo pacman -S --needed --noconfirm "${pacman_pkgs[@]}"
+    fi
+    if [[ ${#aur_pkgs[@]} -gt 0 ]]; then
+        if ! command -v paru >/dev/null 2>&1; then
+            echo -e "${RED}Error: paru not found. Install paru first.${NC}"
+        else
+            echo -e "${BOLD}Installing via paru (AUR):${NC}"
+            echo -e "  ${YELLOW}${aur_pkgs[*]}${NC}"
+            paru -S --needed --noconfirm "${aur_pkgs[@]}"
+        fi
+    fi
+    if [[ ${#pacman_pkgs[@]} -eq 0 && ${#aur_pkgs[@]} -eq 0 ]]; then
+        echo -e "${GREEN}All tools already installed!${NC}"
     fi
     div
 }
@@ -355,6 +514,7 @@ show_help() {
     echo -e "    ${GREEN}list${NC}     List all repositories"
     echo -e "    ${GREEN}link${NC}     Execute link.sh in all repositories"
     echo -e "    ${GREEN}doctor${NC}   Check required and optional tools"
+    echo -e "    ${GREEN}install${NC}  Install missing tools (pacman + AUR)"
     echo -e "    ${GREEN}protocol${NC}  Switch clone protocol (https|ssh)"
     echo
     echo -e "${CYAN}Examples:${NC}"
@@ -363,6 +523,9 @@ show_help() {
     echo "    menv list"
     echo "    menv link"
     echo "    menv doctor"
+    echo "    menv install"
+    echo "    menv install cli"
+    echo "    menv install --list"
     echo "    menv protocol ssh"
 }
 
@@ -375,6 +538,7 @@ main() {
         list)   cmd_list ;;
         link)   cmd_link ;;
         doctor) cmd_doctor ;;
+        install) cmd_install "$@" ;;
         protocol) cmd_protocol "$@" ;;
         help|--help|-h) show_help ;;
         "")
