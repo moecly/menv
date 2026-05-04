@@ -95,7 +95,6 @@ TOOLS=(
     "aur:productivity:optional:winboat::Windows 兼容层"
     "pacman:productivity:optional:lutris:lutris:Linux 游戏平台"
     "aur:productivity:optional:freedownloadmanager:fdm:多协议的下载加速工具"
-    "aur:other:optional:alacritty-theme-git::Alacritty 主题"
     "pacman:other:optional:dms-shell-niri:dms:动态菜单"
     "pacman:other:optional:opencode:opencode:AI 编程助手"
 )
