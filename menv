@@ -25,15 +25,93 @@ div() {
     printf "${CYAN}%s${NC}\n" "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 
-get_max_name_length() {
-    local max_len=0
-    for item in "$@"; do
-        name="${item%%:*}"
-        len=${#name}
-        ((len > max_len)) && max_len=$len
-    done
-    echo $max_len
-}
+# 字段: source:分类:type:包名:检测命令:描述
+# source: pacman / aur / 空（无法通过包管理器安装）
+TOOLS=(
+    "pacman:基础工具:required:git:git:版本控制"
+    "pacman:基础工具:required:fd:fd:快速文件搜索"
+    "pacman:基础工具:required:ripgrep:rg:快速代码搜索"
+    "pacman:基础工具:required:fzf:fzf:模糊查找工具"
+    "pacman:Shell/终端:required:zsh:zsh:Shell"
+    "pacman:Shell/终端:required:tmux:tmux:终端复用器"
+    "pacman:Shell/终端:required:nvim:nvim:文本编辑器"
+    "pacman:文件管理:required:eza:eza:现代的 ls 替代品"
+    "pacman:文件管理:required:trash-cli:trash:回收站工具"
+    "pacman:文件管理:required:zoxide:zoxide:快速目录导航"
+    "pacman:TUI 客户端:required:lazygit:lazygit:TUI Git 客户端"
+    "pacman:包管理器/语言运行时:optional:npm:npm:Node.js 包管理器"
+    "pacman:包管理器/语言运行时:optional:nodejs:nodejs:JavaScript 运行时"
+    "pacman:包管理器/语言运行时:optional:python:python3:Python 解释器"
+    "pacman:包管理器/语言运行时:optional:python-pip:pip3:Python 包管理器"
+    "pacman:包管理器/语言运行时:optional:python-pipx:pipx:Python 应用隔离安装"
+    "pacman:包管理器/语言运行时:optional:gcc:gcc:C/C++ 编译器"
+    "aur:包管理器/语言运行时:optional:paru:paru:AUR 包管理器"
+    "pacman:Wayland/桌面:optional:niri:niri:Wayland 合成器"
+    "pacman:Wayland/桌面:optional:fuzzel:fuzzel:Wayland 应用启动器"
+    "pacman:Wayland/桌面:optional:kitty:kitty:GPU 加速终端"
+    "pacman:Wayland/桌面:optional:xwayland-satellite:xwayland-satellite:XWayland 兼容层"
+    "aur:Wayland/桌面:optional:wlogout:wlogout:Wayland 锁屏工具"
+    "pacman:输入法/字体:optional:fcitx5:fcitx5:输入法框架"
+    "pacman:输入法/字体:optional:fcitx5-qt::输入法框架 Qt 插件"
+    "pacman:输入法/字体:optional:fcitx5-gtk::输入法框架 GTK 插件"
+    "pacman:输入法/字体:optional:fcitx5-configtool:fcitx5-configtool:输入法框架配置工具"
+    "pacman:输入法/字体:optional:fcitx5-chinese-addons::输入法框架中文插件"
+    "pacman:输入法/字体:optional:noto-fonts-cjk::Google Noto CJK 字体"
+    "pacman:输入法/字体:optional:ttf-0xproto-nerd::等宽字体"
+    "pacman:CLI 增强工具:optional:git-delta:delta:Git 差异查看工具"
+    "pacman:CLI 增强工具:optional:procs:procs:进程查看工具"
+    "pacman:CLI 增强工具:optional:xh:xh:现代的 HTTP 客户端"
+    "pacman:CLI 增强工具:optional:gping:gping:Ping 工具"
+    "pacman:CLI 增强工具:optional:btop:btop:系统监控工具"
+    "pacman:CLI 增强工具:optional:dust:dust:磁盘使用情况分析工具"
+    "pacman:CLI 增强工具:optional:duf:duf:磁盘使用情况分析工具"
+    "pacman:CLI 增强工具:optional:bat:bat:语法高亮的 cat 工具"
+    "pacman:CLI 增强工具:optional:ouch:ouch:压缩工具"
+    "pacman:CLI 增强工具:optional:tldr:tldr:简化版的 man 页面"
+    "pacman:CLI 增强工具:optional:ncdu:ncdu:磁盘使用情况分析工具"
+    "pacman:CLI 增强工具:optional:plocate:plocate:快速文件搜索工具"
+    "pacman:CLI 增强工具:optional:cava:cava:音频可视化工具"
+    "pacman:CLI 增强工具:optional:unzip:unzip:解压缩工具"
+    "pacman:网络/安全:optional:openssh:ssh:SSH 客户端"
+    "pacman:网络/安全:optional:chromium:chromium:网页浏览器"
+    "aur:网络/安全:optional:clash-verge-rev-bin:clash-verge:代理客户端"
+    "aur:网络/安全:optional:localsend-bin:localsend:局域网文件传输"
+    "pacman:网络/安全:optional:ufw:ufw:防火墙"
+    "pacman:网络/安全:optional:tuned:tuned:系统调优守护进程"
+    "pacman:网络/安全:optional:keepassxc:keepassxc:密码管理器"
+    "pacman:系统管理:optional:timeshift:timeshift:系统快照工具"
+    "pacman:系统管理:optional:snapper:snapper:Btrfs 快照工具"
+    "pacman:系统管理:optional:snap-pac::Pacman 钩子自动快照"
+    "pacman:系统管理:optional:ntfs-3g:ntfs-3g:NTFS 文件系统支持"
+    "pacman:系统管理:optional:kdiskmark:kdiskmark:磁盘性能测试工具"
+    "pacman:系统管理:optional:keyd:keyd:键盘重映射工具"
+    "pacman:系统管理:optional:polkit::Polkit 权限管理工具"
+    "pacman:系统管理:optional:polkit-kde-agent::Polkit 权限管理工具"
+    "pacman:生产力/娱乐:optional:libreoffice:libreoffice:办公套件"
+    "pacman:生产力/娱乐:optional:okular:okular:文档查看器"
+    "pacman:生产力/娱乐:optional:virtualbox:virtualbox:虚拟机软件"
+    "aur:生产力/娱乐:optional:winboat::Windows 兼容层"
+    "pacman:生产力/娱乐:optional:lutris:lutris:Linux 游戏平台"
+    "aur:生产力/娱乐:optional:freedownloadmanager:fdm:多协议的下载加速工具"
+    "aur:其他:optional:alacritty-theme-git::Alacritty 主题"
+    "pacman:其他:optional:dms-shell-niri:dms:动态菜单"
+    "pacman:其他:optional:opencode:opencode:AI 编程助手"
+)
+
+CATEGORY_ALIASES=(
+    "base:基础工具"
+    "shell:Shell/终端"
+    "file:文件管理"
+    "tui:TUI 客户端"
+    "pkg:包管理器/语言运行时"
+    "wayland:Wayland/桌面"
+    "input:输入法/字体"
+    "cli:CLI 增强工具"
+    "net:网络/安全"
+    "system:系统管理"
+    "productivity:生产力/娱乐"
+    "other:其他"
+)
 
 REPOS=(
     "tmux:https://github.com/moecly/tmux-config.git"
@@ -49,109 +127,28 @@ REPOS=(
     "wlogout:https://github.com/moecly/wlogout-config.git"
 )
 
-REQUIRED_TOOLS=(
-    "git:git:版本控制:pacman"
-    "fd:fd fdfind:快速文件搜索:pacman"
-    "ripgrep:rg:快速代码搜索:pacman"
-    "fzf:fzf:模糊查找工具:pacman"
-)
+get_max_name_length() {
+    local max_len=0
+    for item in "$@"; do
+        IFS=: read -r _source _cat _type name _cmds _desc <<< "$item"
+        len=${#name}
+        ((len > max_len)) && max_len=$len
+    done
+    echo $max_len
+}
 
-REQUIRED_SHELL_TERMINAL=(
-    "zsh:zsh:Shell:pacman"
-    "tmux:tmux:终端复用器:pacman"
-    "nvim:nvim:文本编辑器:pacman"
-)
-
-REQUIRED_FILE_MANAGEMENT=(
-    "eza:eza:现代的 ls 替代品:pacman"
-    "trash-cli:trash:回收站工具:pacman"
-    "zoxide:zoxide:快速目录导航工具:pacman"
-)
-
-REQUIRED_TUI_CLIENTS=(
-    "lazygit:lazygit:TUI Git 客户端:pacman"
-)
-
-OPTIONAL_PACKAGE_MANAGERS=(
-    "npm:npm:Node.js 包管理器:pacman"
-    "nodejs:nodejs node:JavaScript 运行时:pacman"
-    "python:python3:Python 解释器:pacman"
-    "python-pip:pip3:Python 包管理器:pacman"
-    "python-pipx:pipx:Python 应用隔离安装:pacman"
-    "gcc:gcc:C/C++ 编译器:pacman"
-    "paru:paru:AUR 包管理器:aur"
-)
-
-OPTIONAL_WAYLAND_DESKTOP=(
-    "niri:niri:Wayland 合成器:pacman"
-    "fuzzel:fuzzel:Wayland 应用启动器:pacman"
-    "kitty:kitty:GPU 加速终端:pacman"
-    "xwayland-satellite:xwayland-satellite:XWayland 兼容层:pacman"
-    "wlogout:wlogout:Wayland 锁屏工具:aur"
-)
-
-OPTIONAL_INPUT_METHOD_FONTS=(
-    "fcitx5:fcitx5:输入法框架:pacman"
-    "fcitx5-qt::输入法框架 Qt 插件:pacman"
-    "fcitx5-gtk::输入法框架 GTK 插件:pacman"
-    "fcitx5-configtool:fcitx5-configtool:输入法框架配置工具:pacman"
-    "fcitx5-chinese-addons::输入法框架中文插件:pacman"
-    "noto-fonts-cjk::Google Noto CJK 字体:pacman"
-    "ttf-0xproto-nerd::等宽字体:pacman"
-)
-
-OPTIONAL_CLI_ENHANCEMENTS=(
-    "git-delta:delta:Git 差异查看工具:pacman"
-    "procs:procs:进程查看工具:pacman"
-    "xh:xh:现代的 HTTP 客户端:pacman"
-    "gping:gping:Ping 工具:pacman"
-    "btop:btop:系统监控工具:pacman"
-    "dust:dust:磁盘使用情况分析工具:pacman"
-    "duf:duf:磁盘使用情况分析工具:pacman"
-    "bat:bat:语法高亮的 cat 工具:pacman"
-    "ouch:ouch:压缩工具:pacman"
-    "tldr:tldr:简化版的 man 页面:pacman"
-    "ncdu:ncdu:磁盘使用情况分析工具:pacman"
-    "plocate:plocate:快速文件搜索工具:pacman"
-    "cava:cava:音频可视化工具:pacman"
-    "unzip:unzip:解压缩工具:pacman"
-)
-
-OPTIONAL_NETWORK_SECURITY=(
-    "openssh:ssh:SSH 客户端:pacman"
-    "chromium:chromium:网页浏览器:pacman"
-    "clash-verge-rev-bin:clash-verge:代理客户端:aur"
-    "localsend-bin:localsend:局域网文件传输:aur"
-    "ufw:ufw:防火墙:pacman"
-    "tuned:tuned:系统调优守护进程:pacman"
-    "keepassxc:keepassxc:密码管理器:pacman"
-)
-
-OPTIONAL_SYSTEM_MANAGEMENT=(
-    "timeshift:timeshift:系统快照工具:pacman"
-    "snapper:snapper:Btrfs 快照工具:pacman"
-    "snap-pac::Pacman 钩子自动快照:pacman"
-    "ntfs-3g:ntfs-3g:NTFS 文件系统支持:pacman"
-    "kdiskmark:kdiskmark:磁盘性能测试工具:pacman"
-    "keyd:keyd:键盘重映射工具:pacman"
-    "polkit::Polkit 权限管理工具:pacman"
-    "polkit-kde-agent::Polkit 权限管理工具:pacman"
-)
-
-OPTIONAL_PRODUCTIVITY_ENTERTAINMENT=(
-    "libreoffice:libreoffice:办公套件:pacman"
-    "okular:okular:文档查看器:pacman"
-    "virtualbox:virtualbox:虚拟机软件:pacman"
-    "winboat::Windows 兼容层:aur"
-    "lutris:lutris:Linux 游戏平台:pacman"
-    "freedownloadmanager:fdm:多协议的下载加速工具:aur"
-)
-
-OPTIONAL_OTHER=(
-    "alacritty-theme-git::Alacritty 主题:aur"
-    "dms-shell-niri:dms:动态菜单:pacman"
-    "opencode:opencode:AI 编程助手:pacman"
-)
+get_categories() {
+    local -A seen
+    local categories=()
+    for tool in "${TOOLS[@]}"; do
+        IFS=: read -r _source category _rest <<< "$tool"
+        if [[ -z "${seen[$category]}" ]]; then
+            seen[$category]=1
+            categories+=("$category")
+        fi
+    done
+    echo "${categories[@]}"
+}
 
 check_base_dir() {
     if [[ ! -d "$BASE_DIR" ]]; then
@@ -233,39 +230,50 @@ cmd_doctor() {
 
     local missing_required=()
     local missing_optional=()
+    local categories=($(get_categories))
+    local current_cat=""
+    local cat_tools=()
+    local max_width=0
 
-    check_category() {
-        local label="$1"
-        shift
-        local tools=("$@")
-        local max_width=$(get_max_name_length "${tools[@]}")
-        local is_optional=0
-        if [[ "$label" == Optional:* ]]; then
-            is_optional=1
+    print_category() {
+        if [[ ${#cat_tools[@]} -eq 0 ]]; then
+            return
         fi
-
-        echo -e "${BOLD}$label:${NC}"
-        for tool in "${tools[@]}"; do
-            IFS=: read -r name cmds desc source <<< "$tool"
+        max_width=$(get_max_name_length "${cat_tools[@]}")
+        echo -e "${BOLD}$current_cat:${NC}"
+        for t in "${cat_tools[@]}"; do
+            IFS=: read -r source category type name cmds desc <<< "$t"
             local found=0
-            if [[ -z "$cmds" ]]; then
-                printf "  ${YELLOW}?${NC}  %-${max_width}s ${YELLOW}skip${NC}" "$name"
-            else
-                for cmd in $cmds; do
-                    if command -v "$cmd" >/dev/null 2>&1; then
-                        found=1
-                        break
-                    fi
-                done
+            if [[ "$type" == "required" ]]; then
+                if [[ -n "$cmds" ]]; then
+                    for cmd in $cmds; do
+                        if command -v "$cmd" >/dev/null 2>&1; then
+                            found=1
+                            break
+                        fi
+                    done
+                fi
                 if [[ $found -eq 1 ]]; then
                     printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
                 else
-                    if [[ $is_optional -eq 1 ]]; then
+                    printf "  ${RED}✗${NC}  %-${max_width}s ${RED}not found${NC}" "$name"
+                    missing_required+=("$name:$desc:$source")
+                fi
+            else
+                if [[ -z "$cmds" ]]; then
+                    printf "  ${YELLOW}?${NC}  %-${max_width}s ${YELLOW}skip${NC}" "$name"
+                else
+                    for cmd in $cmds; do
+                        if command -v "$cmd" >/dev/null 2>&1; then
+                            found=1
+                            break
+                        fi
+                    done
+                    if [[ $found -eq 1 ]]; then
+                        printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
+                    else
                         printf "  ${YELLOW}⚠${NC}  %-${max_width}s ${YELLOW}not found${NC}" "$name"
                         missing_optional+=("$name:$desc:$source")
-                    else
-                        printf "  ${RED}✗${NC}  %-${max_width}s ${RED}not found${NC}" "$name"
-                        missing_required+=("$name:$desc:$source")
                     fi
                 fi
             fi
@@ -276,20 +284,18 @@ cmd_doctor() {
             fi
         done
         echo
+        cat_tools=()
     }
 
-    check_category "Required: 基础工具" "${REQUIRED_TOOLS[@]}"
-    check_category "Required: Shell/终端" "${REQUIRED_SHELL_TERMINAL[@]}"
-    check_category "Required: 文件管理" "${REQUIRED_FILE_MANAGEMENT[@]}"
-    check_category "Required: TUI 客户端" "${REQUIRED_TUI_CLIENTS[@]}"
-    check_category "Optional: 包管理器/语言运行时" "${OPTIONAL_PACKAGE_MANAGERS[@]}"
-    check_category "Optional: Wayland/桌面" "${OPTIONAL_WAYLAND_DESKTOP[@]}"
-    check_category "Optional: 输入法/字体" "${OPTIONAL_INPUT_METHOD_FONTS[@]}"
-    check_category "Optional: CLI 增强工具" "${OPTIONAL_CLI_ENHANCEMENTS[@]}"
-    check_category "Optional: 网络/安全" "${OPTIONAL_NETWORK_SECURITY[@]}"
-    check_category "Optional: 系统管理" "${OPTIONAL_SYSTEM_MANAGEMENT[@]}"
-    check_category "Optional: 生产力/娱乐" "${OPTIONAL_PRODUCTIVITY_ENTERTAINMENT[@]}"
-    check_category "Optional: 其他" "${OPTIONAL_OTHER[@]}"
+    for tool in "${TOOLS[@]}"; do
+        IFS=: read -r _src tcat _rest <<< "$tool"
+        if [[ "$tcat" != "$current_cat" ]]; then
+            print_category
+            current_cat="$tcat"
+        fi
+        cat_tools+=("$tool")
+    done
+    print_category
 
     echo
     div
@@ -302,10 +308,12 @@ cmd_doctor() {
     else
         for tool in "${missing_required[@]}"; do
             IFS=: read -r name desc source <<< "$tool"
+            local tag=""
+            [[ -n "$source" ]] && tag=" [$source]"
             if [[ -n "$desc" ]]; then
-                echo -e "  ${RED}✗${NC} $name ${CYAN}($desc)${NC}"
+                echo -e "  ${RED}✗${NC} $name ${CYAN}($desc)${NC}${tag}"
             else
-                echo -e "  ${RED}✗${NC} $name"
+                echo -e "  ${RED}✗${NC} $name${tag}"
             fi
         done
     fi
@@ -317,14 +325,27 @@ cmd_doctor() {
     else
         for tool in "${missing_optional[@]}"; do
             IFS=: read -r name desc source <<< "$tool"
+            local tag=""
+            [[ -n "$source" ]] && tag=" [$source]"
             if [[ -n "$desc" ]]; then
-                echo -e "  ${YELLOW}⚠${NC} $name ${CYAN}($desc)${NC}"
+                echo -e "  ${YELLOW}⚠${NC} $name ${CYAN}($desc)${NC}${tag}"
             else
-                echo -e "  ${YELLOW}⚠${NC} $name"
+                echo -e "  ${YELLOW}⚠${NC} $name${tag}"
             fi
         done
     fi
     div
+}
+
+resolve_alias() {
+    for entry in "${CATEGORY_ALIASES[@]}"; do
+        IFS=: read -r alias name <<< "$entry"
+        if [[ "$1" == "$alias" ]]; then
+            echo "$name"
+            return
+        fi
+    done
+    echo ""
 }
 
 cmd_install() {
@@ -335,76 +356,13 @@ cmd_install() {
         div
         echo -e "${BOLD}  Available Categories${NC}"
         div
-        echo -e "  ${GREEN}base${NC}               基础工具"
-        echo -e "  ${GREEN}shell${NC}              Shell/终端"
-        echo -e "  ${GREEN}file${NC}               文件管理"
-        echo -e "  ${GREEN}tui${NC}                TUI 客户端"
-        echo -e "  ${GREEN}pkg${NC}                包管理器/语言运行时"
-        echo -e "  ${GREEN}wayland${NC}            Wayland/桌面"
-        echo -e "  ${GREEN}input${NC}              输入法/字体"
-        echo -e "  ${GREEN}cli${NC}                CLI 增强工具"
-        echo -e "  ${GREEN}net${NC}                网络/安全"
-        echo -e "  ${GREEN}system${NC}             系统管理"
-        echo -e "  ${GREEN}productivity${NC}       生产力/娱乐"
-        echo -e "  ${GREEN}other${NC}              其他"
+        for entry in "${CATEGORY_ALIASES[@]}"; do
+            IFS=: read -r alias name <<< "$entry"
+            printf "  ${GREEN}%-16s${NC} %s\n" "$alias" "$name"
+        done
         div
         return
     fi
-
-    local pacman_pkgs=()
-    local aur_pkgs=()
-
-    resolve_alias() {
-        case "$1" in
-            base) echo "基础工具:REQUIRED_TOOLS" ;;
-            shell) echo "Shell/终端:REQUIRED_SHELL_TERMINAL" ;;
-            file) echo "文件管理:REQUIRED_FILE_MANAGEMENT" ;;
-            tui) echo "TUI 客户端:REQUIRED_TUI_CLIENTS" ;;
-            pkg) echo "包管理器/语言运行时:OPTIONAL_PACKAGE_MANAGERS" ;;
-            wayland) echo "Wayland/桌面:OPTIONAL_WAYLAND_DESKTOP" ;;
-            input) echo "输入法/字体:OPTIONAL_INPUT_METHOD_FONTS" ;;
-            cli) echo "CLI 增强工具:OPTIONAL_CLI_ENHANCEMENTS" ;;
-            net) echo "网络/安全:OPTIONAL_NETWORK_SECURITY" ;;
-            system) echo "系统管理:OPTIONAL_SYSTEM_MANAGEMENT" ;;
-            productivity) echo "生产力/娱乐:OPTIONAL_PRODUCTIVITY_ENTERTAINMENT" ;;
-            other) echo "其他:OPTIONAL_OTHER" ;;
-            *) echo "" ;;
-        esac
-    }
-
-    install_from_category() {
-        local cat_entry="$1"
-        IFS=: read -r label array_name <<< "$cat_entry"
-
-        echo -e "${BOLD}$label:${NC}"
-        local -n arr="$array_name"
-        for tool in "${arr[@]}"; do
-            IFS=: read -r name cmds desc source <<< "$tool"
-            local installed=0
-            if [[ -n "$cmds" ]]; then
-                for cmd in $cmds; do
-                    if command -v "$cmd" >/dev/null 2>&1; then
-                        installed=1
-                        break
-                    fi
-                done
-            elif pacman -Qi "$name" >/dev/null 2>&1; then
-                installed=1
-            fi
-            if [[ $installed -eq 1 ]]; then
-                echo -e "  ${GREEN}✓${NC} $name (already installed)"
-            else
-                if [[ "$source" == "aur" ]]; then
-                    echo -e "  ${YELLOW}+${NC} $name [aur]"
-                    aur_pkgs+=("$name")
-                else
-                    echo -e "  ${GREEN}+${NC} $name [pacman]"
-                    pacman_pkgs+=("$name")
-                fi
-            fi
-        done
-        echo
-    }
 
     if [[ -n "$target" ]]; then
         local resolved=$(resolve_alias "$target")
@@ -413,27 +371,67 @@ cmd_install() {
             echo -e "Run ${CYAN}menv install --list${NC} to see available categories"
             return 1
         fi
-        install_from_category "$resolved"
-    else
-        install_from_category "基础工具:REQUIRED_TOOLS"
-        install_from_category "Shell/终端:REQUIRED_SHELL_TERMINAL"
-        install_from_category "文件管理:REQUIRED_FILE_MANAGEMENT"
-        install_from_category "TUI 客户端:REQUIRED_TUI_CLIENTS"
-        install_from_category "包管理器/语言运行时:OPTIONAL_PACKAGE_MANAGERS"
-        install_from_category "Wayland/桌面:OPTIONAL_WAYLAND_DESKTOP"
-        install_from_category "输入法/字体:OPTIONAL_INPUT_METHOD_FONTS"
-        install_from_category "CLI 增强工具:OPTIONAL_CLI_ENHANCEMENTS"
-        install_from_category "网络/安全:OPTIONAL_NETWORK_SECURITY"
-        install_from_category "系统管理:OPTIONAL_SYSTEM_MANAGEMENT"
-        install_from_category "生产力/娱乐:OPTIONAL_PRODUCTIVITY_ENTERTAINMENT"
-        install_from_category "其他:OPTIONAL_OTHER"
     fi
 
-    pacman_pkgs=($(printf '%s\n' "${pacman_pkgs[@]}" 2>/dev/null | sort -u))
-    aur_pkgs=($(printf '%s\n' "${aur_pkgs[@]}" 2>/dev/null | sort -u))
+    local pacman_pkgs=()
+    local aur_pkgs=()
+    local skip_pkgs=()
+    local current_cat=""
+    local has_output=0
 
     echo
     div
+    echo -e "${BOLD}  Installing Tools${NC}"
+    div
+
+    for tool in "${TOOLS[@]}"; do
+        IFS=: read -r source category type name cmds desc <<< "$tool"
+
+        if [[ -n "$target" && "$category" != "$resolved" ]]; then
+            continue
+        fi
+
+        if [[ "$category" != "$current_cat" ]]; then
+            if [[ $has_output -eq 1 ]]; then
+                echo
+            fi
+            echo -e "${BOLD}$category:${NC}"
+            current_cat="$category"
+            has_output=1
+        fi
+
+        local installed=0
+        if [[ -n "$cmds" ]]; then
+            for cmd in $cmds; do
+                if command -v "$cmd" >/dev/null 2>&1; then
+                    installed=1
+                    break
+                fi
+            done
+        elif [[ -n "$source" ]] && pacman -Qi "$name" >/dev/null 2>&1; then
+            installed=1
+        fi
+
+        if [[ $installed -eq 1 ]]; then
+            echo -e "  ${GREEN}✓${NC} $name (already installed)"
+        elif [[ -z "$source" ]]; then
+            echo -e "  ${YELLOW}?${NC} $name (no package source)${CYAN}($desc)${NC}"
+        else
+            if [[ "$source" == "aur" ]]; then
+                echo -e "  ${YELLOW}+${NC} $name [aur]"
+                aur_pkgs+=("$name")
+            else
+                echo -e "  ${GREEN}+${NC} $name [pacman]"
+                pacman_pkgs+=("$name")
+            fi
+        fi
+    done
+
+    echo
+    div
+    pacman_pkgs=($(printf '%s\n' "${pacman_pkgs[@]}" 2>/dev/null | sort -u))
+    aur_pkgs=($(printf '%s\n' "${aur_pkgs[@]}" 2>/dev/null | sort -u))
+
     if [[ ${#pacman_pkgs[@]} -gt 0 ]]; then
         echo -e "${BOLD}Installing via pacman:${NC}"
         echo -e "  ${GREEN}${pacman_pkgs[*]}${NC}"
