@@ -150,6 +150,28 @@ get_categories() {
     echo "${categories[@]}"
 }
 
+check_installed() {
+    local source="$1"
+    local name="$2"
+    local cmds="$3"
+
+    if command -v pacman >/dev/null 2>&1 && [[ -n "$source" ]]; then
+        if pacman -Qi "$name" >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+
+    if [[ -n "$cmds" ]]; then
+        for cmd in $cmds; do
+            if command -v "$cmd" >/dev/null 2>&1; then
+                return 0
+            fi
+        done
+    fi
+
+    return 1
+}
+
 check_base_dir() {
     if [[ ! -d "$BASE_DIR" ]]; then
         mkdir -p "$BASE_DIR"
@@ -243,33 +265,22 @@ cmd_doctor() {
         echo -e "${BOLD}$current_cat:${NC}"
         for t in "${cat_tools[@]}"; do
             IFS=: read -r source category type name cmds desc <<< "$t"
-            local found=0
             if [[ "$type" == "required" ]]; then
-                if [[ -n "$cmds" ]]; then
-                    for cmd in $cmds; do
-                        if command -v "$cmd" >/dev/null 2>&1; then
-                            found=1
-                            break
-                        fi
-                    done
-                fi
-                if [[ $found -eq 1 ]]; then
+                if check_installed "$source" "$name" "$cmds"; then
                     printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
                 else
                     printf "  ${RED}✗${NC}  %-${max_width}s ${RED}not found${NC}" "$name"
                     missing_required+=("$name:$desc:$source")
                 fi
             else
-                if [[ -z "$cmds" ]]; then
+                local skip=0
+                if [[ -z "$cmds" && -z "$source" ]]; then
+                    skip=1
+                fi
+                if [[ $skip -eq 1 ]]; then
                     printf "  ${YELLOW}?${NC}  %-${max_width}s ${YELLOW}skip${NC}" "$name"
                 else
-                    for cmd in $cmds; do
-                        if command -v "$cmd" >/dev/null 2>&1; then
-                            found=1
-                            break
-                        fi
-                    done
-                    if [[ $found -eq 1 ]]; then
+                    if check_installed "$source" "$name" "$cmds"; then
                         printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
                     else
                         printf "  ${YELLOW}⚠${NC}  %-${max_width}s ${YELLOW}not found${NC}" "$name"
@@ -400,19 +411,7 @@ cmd_install() {
             has_output=1
         fi
 
-        local installed=0
-        if [[ -n "$cmds" ]]; then
-            for cmd in $cmds; do
-                if command -v "$cmd" >/dev/null 2>&1; then
-                    installed=1
-                    break
-                fi
-            done
-        elif [[ -n "$source" ]] && pacman -Qi "$name" >/dev/null 2>&1; then
-            installed=1
-        fi
-
-        if [[ $installed -eq 1 ]]; then
+        if check_installed "$source" "$name" "$cmds"; then
             echo -e "  ${GREEN}✓${NC} $name (already installed)"
         elif [[ -z "$source" ]]; then
             echo -e "  ${YELLOW}?${NC} $name (no package source)${CYAN}($desc)${NC}"
