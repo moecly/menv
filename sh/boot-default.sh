@@ -69,11 +69,6 @@ for i in "${!TITLES[@]}"; do
 done
 echo
 
-# Get current default entry
-current=$(sudo bootctl get-default 2>/dev/null || echo "unknown")
-echo "==> Current default: $current"
-echo
-
 # Prompt user for selection
 read -rp "Select default entry (1-${#ENTRIES[@]}): " choice
 

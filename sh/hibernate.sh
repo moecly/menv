@@ -295,6 +295,7 @@ case "$1" in
         case "$KERNEL_TYPE" in
             lts)  TITLE="Arch Linux (linux-lts)" ;;
             zen)  TITLE="Arch Linux (linux-zen)" ;;
+            arch) TITLE="Arch Linux (linux)" ;;
             *)    TITLE="Arch Linux" ;;
         esac
 
@@ -369,9 +370,11 @@ echo
 
 echo -e "${GREEN}==> Boot menu configuration complete!${NC}"
 echo "  You will see these entries in systemd-boot menu:"
-echo "    - Arch Linux (linux-zen)"
-echo "    - Arch Linux (linux-zen, no resume)"
+echo "    - Arch Linux (linux)"
+echo "    - Arch Linux (linux) (no resume)"
 echo "    - Arch Linux (linux-lts)"
-echo "    - Arch Linux (linux-lts, no resume)"
+echo "    - Arch Linux (linux-lts) (no resume)"
+echo "    - Arch Linux (linux-zen)"
+echo "    - Arch Linux (linux-zen) (no resume)"
 echo
 echo "  The menu will appear automatically with 3 second timeout."
