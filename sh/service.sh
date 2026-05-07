@@ -22,6 +22,9 @@ SERVICES=(
     "system:systemd-timesyncd.service:时间同步服务"
     "system:snapper-timeline.timer:Snapper 定时快照"
     "system:snapper-cleanup.timer:Snapper 定期清理"
+    "system:btrfs-trim.timer:Btrfs TRIM 定时任务"
+    "system:btrfs-scrub.timer:Btrfs 数据校验定时任务"
+    "system:btrfs-balance.timer:Btrfs 空间平衡定时任务"
 )
 
 echo -e "${BOLD}==> Enabling system services...${NC}"
