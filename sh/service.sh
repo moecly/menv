@@ -25,6 +25,7 @@ SERVICES=(
     "system:btrfs-trim.timer:Btrfs TRIM 定时任务"
     "system:btrfs-scrub.timer:Btrfs 数据校验定时任务"
     "system:btrfs-balance.timer:Btrfs 空间平衡定时任务"
+    "system:tailscaled.service:VPN 内网穿透服务"
 )
 
 echo -e "${BOLD}==> Enabling system services...${NC}"
