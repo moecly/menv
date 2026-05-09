@@ -25,6 +25,7 @@ SERVICES=(
     "system:fstrim.timer:文件系统 TRIM 定时任务"
     "system:btrfs-scrub.timer:Btrfs 数据校验定时任务"
     "system:btrfs-balance.timer:Btrfs 空间平衡定时任务"
+    "system:cronie.service:Cron 定时任务服务"
     "system:udisks2.service:磁盘管理 (udisks2)"
     "system:tailscaled.service:VPN 内网穿透服务"
     "user:syncthing.service:文件同步服务"
