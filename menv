@@ -4,7 +4,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BASE_DIR="${MOECLY_DIR:-$HOME/.moecly_conf}"
 
 # Load configuration
-source "$SCRIPT_DIR/config.conf"
+for conf in "$SCRIPT_DIR"/config/*.conf; do
+    source "$conf"
+done
 
 # ============================================================
 # Colors & Helpers
@@ -391,6 +393,50 @@ cmd_link() {
     div
 }
 
+cmd_status() {
+    build_pacman_cache
+
+    local repo_total=${#REPOS[@]}
+    local repo_cloned=0
+    for item in "${REPOS[@]}"; do
+        name="${item%%:*}"
+        [[ -d "$BASE_DIR/$name/.git" ]] && repo_cloned=$((repo_cloned + 1))
+    done
+
+    local tool_total=${#TOOLS[@]}
+    local tool_installed=0
+    local missing_required=()
+    for tool in "${TOOLS[@]}"; do
+        IFS=: read -r source category type name cmds desc <<< "$tool"
+        if check_installed "$source" "$name" "$cmds"; then
+            tool_installed=$((tool_installed + 1))
+        elif [[ "$type" == "required" ]]; then
+            missing_required+=("$name")
+        fi
+    done
+
+    echo
+    div
+    echo -e "${BOLD}  Overview${NC}"
+    div
+
+    if [[ $repo_cloned -eq $repo_total ]]; then
+        echo -e "  ${GREEN}✓${NC} Repos:  ${GREEN}${repo_cloned}/${repo_total}${NC} cloned"
+    else
+        echo -e "  ${YELLOW}⚠${NC} Repos:  ${YELLOW}${repo_cloned}/${repo_total}${NC} cloned"
+    fi
+
+    echo -e "  ${CYAN}⬡${NC} Tools:  ${tool_installed}/${tool_total} installed"
+
+    if [[ ${#missing_required[@]} -eq 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} All required tools installed"
+    else
+        echo -e "  ${RED}✗${NC} ${#missing_required[@]} required tools missing: ${RED}${missing_required[*]}${NC}"
+    fi
+
+    div
+}
+
 cmd_protocol() {
     local new_protocol="$1"
     if [[ "$new_protocol" != "https" && "$new_protocol" != "ssh" ]]; then
@@ -489,6 +535,7 @@ show_help() {
     echo -e "    ${GREEN}list${NC}     List all repositories"
     echo -e "    ${GREEN}link${NC}     Execute link.sh in all repositories"
     echo -e "    ${GREEN}doctor${NC}   Check required and optional tools"
+    echo -e "    ${GREEN}status${NC}   Show quick overview (repos + tools)"
     echo -e "    ${GREEN}install${NC}  Install missing tools (pacman + AUR)"
     echo -e "    ${GREEN}run${NC}       Run setup scripts from sh/ directory"
     echo -e "    ${GREEN}protocol${NC}  Switch clone protocol (https|ssh)"
@@ -498,6 +545,7 @@ show_help() {
     echo "    menv pull"
     echo "    menv list"
     echo "    menv link"
+    echo "    menv status"
     echo "    menv doctor"
     echo "    menv install"
     echo "    menv install cli"
@@ -517,6 +565,7 @@ main() {
         list)   cmd_list ;;
         link)   cmd_link ;;
         doctor) cmd_doctor ;;
+        status) cmd_status ;;
         install) cmd_install "$@" ;;
         run)     cmd_run "$@" ;;
         protocol) cmd_protocol "$@" ;;

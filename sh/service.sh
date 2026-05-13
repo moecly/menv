@@ -5,7 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
 MENV_DIR="$(dirname "$SCRIPT_DIR")"
-source "$MENV_DIR/config.conf"
+for conf in "$MENV_DIR"/config/*.conf; do
+    source "$conf"
+done
 
 echo -e "${BOLD}==> Enabling system services...${NC}"
 echo
