@@ -22,8 +22,7 @@ git clone https://aur.archlinux.org/paru.git "$PARU_DIR"
 
 # Build and install
 echo "==> 3/4 Building and installing paru..."
-cd "$PARU_DIR"
-makepkg -si --noconfirm
+(cd "$PARU_DIR" && makepkg -si --noconfirm)
 
 # Clean up
 echo "==> 4/4 Cleaning up..."

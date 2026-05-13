@@ -1,11 +1,8 @@
 #!/bin/bash
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
 
 SWAPFILE="/swap/swapfile"
 MKINITCPIO_DROPIN="/etc/mkinitcpio.conf.d/resume.conf"
@@ -236,7 +233,6 @@ if $needs_fix; then
 fi
 
 # ============================================================
-# Optional: Create boot menu entries for resume/noresume
 # ============================================================
 # Optional: Create boot menu entries for resume/noresume
 # ============================================================

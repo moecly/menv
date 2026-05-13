@@ -1,10 +1,9 @@
 #!/bin/bash
+set -e
 
 # ============================================================
 # Snapper Configuration Script
 # ============================================================
-
-set -e
 
 echo "==> Checking Btrfs root filesystem..."
 if ! findmnt -no FSTYPE / | grep -q btrfs; then
@@ -75,9 +74,23 @@ if [[ -d "$SNAP_DIR" ]]; then
         is_subvolume=true
         echo "==> .snapshots subvolume already exists."
     else
-        echo "==> .snapshots exists but is not a btrfs subvolume. Skipping creation."
-        echo "==> You may need to manually configure snapper."
-        is_subvolume=true  # Skip creation to avoid破坏现有配置
+        echo "==> WARNING: .snapshots exists but is NOT a btrfs subvolume!"
+        echo "==> Snapper requires .snapshots to be a btrfs subvolume to function."
+        read -rp "Convert it to a subvolume? This will move existing contents. (y/N): " fix_confirm
+        if [[ "$fix_confirm" == "y" || "$fix_confirm" == "Y" ]]; then
+            local tmp_dir="/tmp/.snapshots_backup_$$"
+            sudo mv "$SNAP_DIR" "$tmp_dir"
+            sudo btrfs subvolume create "$SNAP_DIR"
+            sudo chmod 750 "$SNAP_DIR"
+            sudo chown root:root "$SNAP_DIR"
+            sudo rsync -a "$tmp_dir/" "$SNAP_DIR/" 2>/dev/null || true
+            sudo rm -rf "$tmp_dir"
+            is_subvolume=true
+            echo "==> Converted .snapshots to btrfs subvolume."
+        else
+            echo "==> Skipping. Snapper may not work correctly."
+            is_subvolume=true
+        fi
     fi
 fi
 

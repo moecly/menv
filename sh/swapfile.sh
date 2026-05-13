@@ -48,7 +48,7 @@ sudo swapon "$SWAPFILE"
 
 echo "==> Updating /etc/fstab..."
 # 先移除旧的 swap 条目
-sudo sed -i '/swap/d' /etc/fstab
+sudo sed -i '/swapfile/d' /etc/fstab
 # 添加新的
 echo "$FSTAB_ENTRY" | sudo tee -a /etc/fstab
 
