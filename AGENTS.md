@@ -4,7 +4,10 @@
 `menv` 是一个 bash 脚本，用于管理 dotfile 仓库集合和系统配置脚本。运行于 Arch Linux，使用 `pacman`/`paru` 进行包管理。
 
 ## 关键路径
-- **配置**: `config.conf` - 定义仓库、工具（包）和脚本
+- **配置**: `config/` - 分为三个配置文件
+  - `config/repos.conf` - 仓库定义
+  - `config/tools.conf` - 工具（包）定义 + 分类别名
+  - `config/scripts.conf` - 脚本 + 服务定义
 - **脚本**: `sh/*.sh` - 系统设置脚本（paru、swapfile、snapper、luks 等）
 - **管理的仓库**: 克隆到 `${MOECLY_DIR:-$HOME/.moecly_conf}/<name>/`
 
@@ -26,12 +29,12 @@ menv protocol ssh|https  # 切换 git 远程协议
 每个仓库应包含一个 `link.sh` 脚本，用于创建指向 `$HOME` 的符号链接。
 
 ## 添加新工具
-编辑 `config.conf` - 在 `TOOLS` 数组中添加条目：
+编辑 `config/tools.conf` - 在 `TOOLS` 数组中添加条目：
 ```
 "<source>:<category>:<type>:<package>:<commands>:<description>"
 ```
 - source: pacman/aur/""（无包来源）
-- category: base/shell/file/tui/pkg/wayland/input/cli/net/system/productivity
+- category: base/shell/file/tui/pkg/wayland/input/cli/net/system/productivity/other
 - type: required/optional
 - package: 实际的 pacman/AUR 包名
 - commands: 用于检测的空格分隔的命令
@@ -39,4 +42,4 @@ menv protocol ssh|https  # 切换 git 远程协议
 
 ## 添加新脚本
 1. 在 `sh/<name>.sh` 创建脚本
-2. 在 `config.conf` 的 `SCRIPTS` 数组中添加: `"<alias>:<filename>:<description>"`
+2. 在 `config/scripts.conf` 的 `SCRIPTS` 数组中添加: `"<alias>:<filename>:<description>"`
