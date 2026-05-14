@@ -393,9 +393,9 @@ cmd_install_interactive() {
             --height=~60% \
             --border=rounded \
             --prompt="Select packages > " \
-            --bind='tab:toggle' \
+            --bind='space:toggle,ctrl-a:select-all,ctrl-x:deselect-all,shift-tab:toggle,ctrl-u:half-page-up,ctrl-d:half-page-down' \
             --color='fg+:green:bold,pointer:green:bold' \
-            --header=$'\e[1mTab: toggle  Enter: install  Esc: cancel\e[0m' |
+            --header=$'\e[1mSpace: toggle  Ctrl-A: select all  Ctrl-X: deselect all  Enter: install  Esc: cancel\e[0m' |
         sed 's/ .*//' | sed $'s/\x1b\\[[0-9;]*m//g')
 
     [[ -z "$selected" ]] && return
