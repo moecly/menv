@@ -305,22 +305,153 @@ cmd_doctor() {
     div
 }
 
-cmd_install() {
-    build_pacman_cache
-    local target="$1"
+do_install_pkgs() {
+    local all_pkgs=("$@")
+    local aur_pkgs=()
+    local pacman_pkgs=()
 
-    if [[ "$target" == "--list" || "$target" == "-l" ]]; then
-        echo
-        div
-        echo -e "${BOLD}  Available Categories${NC}"
-        div
-        for entry in "${CATEGORY_ALIASES[@]}"; do
-            IFS=: read -r alias name <<< "$entry"
-            printf "  ${GREEN}%-16s${NC} %s\n" "$alias" "$name"
-        done
-        div
+    if [[ ${#all_pkgs[@]} -eq 0 ]]; then
+        echo -e "${GREEN}No packages to install.${NC}"
         return
     fi
+
+    for pkg in "${all_pkgs[@]}"; do
+        local found=0
+        for tool in "${TOOLS[@]}"; do
+            IFS=: read -r source _cat _type name _cmds _desc <<< "$tool"
+            if [[ "$name" == "$pkg" && "$source" == "aur" ]]; then
+                found=1
+                break
+            fi
+        done
+        if [[ $found -eq 1 ]]; then
+            aur_pkgs+=("$pkg")
+        else
+            pacman_pkgs+=("$pkg")
+        fi
+    done
+
+    if [[ ${#pacman_pkgs[@]} -gt 0 ]]; then
+        mapfile -t pacman_pkgs < <(printf '%s\n' "${pacman_pkgs[@]}" | sort -u)
+        echo -e "${BOLD}Installing via pacman:${NC}"
+        echo -e "  ${GREEN}${pacman_pkgs[*]}${NC}"
+        sudo pacman -S --needed --ask 4 "${pacman_pkgs[@]}"
+    fi
+    if [[ ${#aur_pkgs[@]} -gt 0 ]]; then
+        mapfile -t aur_pkgs < <(printf '%s\n' "${aur_pkgs[@]}" | sort -u)
+        if ! command -v paru >/dev/null 2>&1; then
+            echo -e "${RED}Error: paru not found. Install paru first.${NC}"
+        else
+            echo -e "${BOLD}Installing via paru (AUR):${NC}"
+            echo -e "  ${YELLOW}${aur_pkgs[*]}${NC}"
+            paru -S --needed --ask 4 "${aur_pkgs[@]}"
+        fi
+    fi
+}
+
+cmd_install_interactive() {
+    local category="$1"
+    local show_all="$2"
+
+    local fzf_input=()
+    local item_data=()
+
+    for tool in "${TOOLS[@]}"; do
+        IFS=: read -r source cat type name cmds desc <<< "$tool"
+        [[ -n "$category" && "$cat" != "$category" ]] && continue
+        [[ -z "$source" ]] && continue
+
+        local installed=0
+        if check_installed "$source" "$name" "$cmds"; then
+            installed=1
+        fi
+
+        if [[ $installed -eq 1 && "$show_all" != "1" ]]; then
+            continue
+        fi
+
+        local cat_label
+        cat_label=$(get_category_label "$cat")
+        item_data+=("${installed}|${name}|${source}")
+
+        if [[ $installed -eq 1 ]]; then
+            fzf_input+=("$(printf '\033[2m%-30s \033[0m %-6s %-16s %s' "${name} ✓" "${source}" "${cat_label}" "${desc}")")
+        else
+            fzf_input+=("$(printf '%-30s %-6s %-16s %s' "${name}" "${source}" "${cat_label}" "${desc}")")
+        fi
+    done
+
+    if [[ ${#fzf_input[@]} -eq 0 ]]; then
+        echo -e "${GREEN}All tools already installed!${NC}"
+        return
+    fi
+
+    local selected
+    selected=$(printf '%s\n' "${fzf_input[@]}" |
+        fzf -m \
+            --ansi \
+            --height=~60% \
+            --border=rounded \
+            --prompt="Select packages > " \
+            --bind='tab:toggle' \
+            --color='fg+:green:bold,pointer:green:bold' \
+            --header=$'\e[1mTab: toggle  Enter: install  Esc: cancel\e[0m' |
+        sed 's/ .*//' | sed $'s/\x1b\\[[0-9;]*m//g')
+
+    [[ -z "$selected" ]] && return
+
+    local to_install=()
+    for pkg in $selected; do
+        local skip=0
+        for item in "${item_data[@]}"; do
+            IFS='|' read -r inst iname _source <<< "$item"
+            if [[ "$iname" == "$pkg" && "$inst" == "1" ]]; then
+                skip=1
+                break
+            fi
+        done
+        [[ $skip -eq 0 ]] && to_install+=("$pkg")
+    done
+
+    if [[ ${#to_install[@]} -eq 0 ]]; then
+        echo -e "${GREEN}No new packages selected.${NC}"
+        return
+    fi
+
+    echo
+    div
+    echo -e "${BOLD}  Packages to install:${NC} ${GREEN}${to_install[*]}${NC}"
+    div
+    do_install_pkgs "${to_install[@]}"
+    div
+}
+
+cmd_install() {
+    build_pacman_cache
+    local target=""
+    local interactive=0
+    local show_all=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -i|--interactive) interactive=1 ;;
+            -a|--all) show_all=1 ;;
+            --list|-l)
+                echo
+                div
+                echo -e "${BOLD}  Available Categories${NC}"
+                div
+                for entry in "${CATEGORY_ALIASES[@]}"; do
+                    IFS=: read -r alias name <<< "$entry"
+                    printf "  ${GREEN}%-16s${NC} %s\n" "$alias" "$name"
+                done
+                div
+                return
+                ;;
+            *) target="$1" ;;
+        esac
+        shift
+    done
 
     if [[ -n "$target" ]]; then
         local resolved=""
@@ -336,6 +467,11 @@ cmd_install() {
             echo -e "Run ${CYAN}menv install --list${NC} to see available categories"
             return 1
         fi
+    fi
+
+    if [[ $interactive -eq 1 ]]; then
+        cmd_install_interactive "$target" "$show_all"
+        return
     fi
 
     local pacman_pkgs=()
@@ -570,6 +706,9 @@ show_help() {
     echo -e "    ${GREEN}doctor${NC}   Check required and optional tools"
     echo -e "    ${GREEN}status${NC}   Show quick overview (repos + tools)"
     echo -e "    ${GREEN}install${NC}  Install missing tools (pacman + AUR)"
+    echo -e "           ${DIM}-i${NC}  Interactive select (fzf)"
+    echo -e "           ${DIM}-a${NC}  Show all (including installed)"
+    echo -e "           ${DIM}<category>${NC}  Install specific category"
     echo -e "    ${GREEN}run${NC}       Run setup scripts from sh/ directory"
     echo -e "    ${GREEN}protocol${NC}  Switch clone protocol (https|ssh)"
     echo
@@ -583,6 +722,9 @@ show_help() {
     echo "    menv install"
     echo "    menv install cli"
     echo "    menv install --list"
+    echo "    menv install -i"
+    echo "    menv install -i wayland"
+    echo "    menv install -i -a"
     echo "    menv run"
     echo "    menv run paru"
     echo "    menv run swapfile 24"
