@@ -18,6 +18,16 @@ div() {
     printf "${CYAN}%s${NC}\n" "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 
+progressbar() {
+    local current="$1" total="$2" width="${3:-20}"
+    local filled=$(( current * width / total ))
+    local empty=$(( width - filled ))
+    local bar=""
+    for ((i = 0; i < filled; i++)); do bar+="█"; done
+    for ((i = 0; i < empty; i++)); do bar+="░"; done
+    echo "$bar"
+}
+
 get_category_label() {
     local alias="$1"
     for entry in "${CATEGORY_ALIASES[@]}"; do
@@ -114,21 +124,27 @@ cmd_init() {
     echo
     echo -e "${BOLD}Initializing repositories...${NC}"
     div
+    local cloned=0 skipped=0 failed=0
     for item in "${REPOS[@]}"; do
         name="${item%%:*}"
         url="${item#*:}"
         repo_path="$BASE_DIR/$name"
         if [[ -d "$repo_path" ]]; then
             echo -e "  ${YELLOW}⊝${NC}  $name"
+            skipped=$((skipped + 1))
         else
             echo -n -e "  ${GREEN}⬢${NC}  Cloning $name... "
             if git clone "$url" "$repo_path" 2>/dev/null; then
                 echo -e "${GREEN}done${NC}"
+                cloned=$((cloned + 1))
             else
                 echo -e "${RED}failed${NC}"
+                failed=$((failed + 1))
             fi
         fi
     done
+    div
+    echo -e "  ${BOLD}Summary:${NC} ${GREEN}✓ ${cloned} cloned${NC}, ${YELLOW}⊝ ${skipped} skipped${NC}${failed:+, ${RED}✗ ${failed} failed${NC}}"
     div
 }
 
@@ -143,14 +159,29 @@ cmd_pull() {
     fi
     div
 
+    local updated=0 uptodate=0 failed=0
     for item in "${REPOS[@]}"; do
         name="${item%%:*}"
         repo_path="$BASE_DIR/$name"
         if [[ -d "$repo_path/.git" ]]; then
-            echo -e "${CYAN}⬇${NC}  Pulling $name"
-            git -C "$repo_path" pull
+            echo -n -e "${CYAN}⬇${NC}  Pulling $name... "
+            local output
+            output=$(git -C "$repo_path" pull 2>&1)
+            local rc=$?
+            if [[ $rc -ne 0 ]]; then
+                echo -e "${RED}failed${NC}"
+                failed=$((failed + 1))
+            elif echo "$output" | grep -q "Already up to date"; then
+                echo -e "${GREEN}up to date${NC}"
+                uptodate=$((uptodate + 1))
+            else
+                echo -e "${GREEN}updated${NC}"
+                updated=$((updated + 1))
+            fi
         fi
     done
+    div
+    echo -e "  ${BOLD}Summary:${NC} ${GREEN}⬇ ${updated} updated${NC}, ${GREEN}✓ ${uptodate} up to date${NC}${failed:+, ${RED}✗ ${failed} failed${NC}}"
     div
 }
 
@@ -420,13 +451,15 @@ cmd_status() {
     echo -e "${BOLD}  Overview${NC}"
     div
 
+    local repo_bar=$(progressbar $repo_cloned $repo_total 20)
     if [[ $repo_cloned -eq $repo_total ]]; then
-        echo -e "  ${GREEN}✓${NC} Repos:  ${GREEN}${repo_cloned}/${repo_total}${NC} cloned"
+        echo -e "  ${GREEN}✓${NC} Repos:  ${GREEN}${repo_bar}${NC}  ${repo_cloned}/${repo_total} cloned"
     else
-        echo -e "  ${YELLOW}⚠${NC} Repos:  ${YELLOW}${repo_cloned}/${repo_total}${NC} cloned"
+        echo -e "  ${YELLOW}⚠${NC} Repos:  ${YELLOW}${repo_bar}${NC}  ${repo_cloned}/${repo_total} cloned"
     fi
 
-    echo -e "  ${CYAN}⬡${NC} Tools:  ${tool_installed}/${tool_total} installed"
+    local tool_bar=$(progressbar $tool_installed $tool_total 20)
+    echo -e "  ${CYAN}⬡${NC} Tools:  ${CYAN}${tool_bar}${NC}  ${tool_installed}/${tool_total} installed"
 
     if [[ ${#missing_required[@]} -eq 0 ]]; then
         echo -e "  ${GREEN}✓${NC} All required tools installed"
