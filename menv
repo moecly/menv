@@ -335,7 +335,7 @@ do_install_pkgs() {
         mapfile -t pacman_pkgs < <(printf '%s\n' "${pacman_pkgs[@]}" | sort -u)
         echo -e "${BOLD}Installing via pacman:${NC}"
         echo -e "  ${GREEN}${pacman_pkgs[*]}${NC}"
-        sudo pacman -S --needed --ask 4 "${pacman_pkgs[@]}"
+        sudo pacman -S --needed --noconfirm "${pacman_pkgs[@]}"
     fi
     if [[ ${#aur_pkgs[@]} -gt 0 ]]; then
         mapfile -t aur_pkgs < <(printf '%s\n' "${aur_pkgs[@]}" | sort -u)
@@ -344,7 +344,7 @@ do_install_pkgs() {
         else
             echo -e "${BOLD}Installing via paru (AUR):${NC}"
             echo -e "  ${YELLOW}${aur_pkgs[*]}${NC}"
-            paru -S --needed --ask 4 "${aur_pkgs[@]}"
+            paru -S --needed --noconfirm "${aur_pkgs[@]}"
         fi
     fi
 }
@@ -525,7 +525,7 @@ cmd_install() {
     if [[ ${#pacman_pkgs[@]} -gt 0 ]]; then
         echo -e "${BOLD}Installing via pacman:${NC}"
         echo -e "  ${GREEN}${pacman_pkgs[*]}${NC}"
-        sudo pacman -S --needed --ask 4 "${pacman_pkgs[@]}"
+        sudo pacman -S --needed --noconfirm "${pacman_pkgs[@]}"
     fi
     if [[ ${#aur_pkgs[@]} -gt 0 ]]; then
         if ! command -v paru >/dev/null 2>&1; then
@@ -533,7 +533,7 @@ cmd_install() {
         else
             echo -e "${BOLD}Installing via paru (AUR):${NC}"
             echo -e "  ${YELLOW}${aur_pkgs[*]}${NC}"
-            paru -S --needed --ask 4 "${aur_pkgs[@]}"
+            paru -S --needed --noconfirm "${aur_pkgs[@]}"
         fi
     fi
     if [[ ${#pacman_pkgs[@]} -eq 0 && ${#aur_pkgs[@]} -eq 0 ]]; then
