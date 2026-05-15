@@ -159,27 +159,43 @@ cmd_pull() {
     fi
     div
 
-    local updated=0 uptodate=0 failed=0
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    local pids=()
+
     for item in "${REPOS[@]}"; do
         name="${item%%:*}"
         repo_path="$BASE_DIR/$name"
-        if [[ -d "$repo_path/.git" ]]; then
-            echo -n -e "${CYAN}⬇${NC}  Pulling $name... "
-            local output
+        [[ -d "$repo_path/.git" ]] || continue
+
+        (
             output=$(git -C "$repo_path" pull 2>&1)
-            local rc=$?
+            rc=$?
             if [[ $rc -ne 0 ]]; then
-                echo -e "${RED}failed${NC}"
-                failed=$((failed + 1))
+                echo "$name:failed" > "$tmpdir/$name"
             elif echo "$output" | grep -q "Already up to date"; then
-                echo -e "${GREEN}up to date${NC}"
-                uptodate=$((uptodate + 1))
+                echo "$name:uptodate" > "$tmpdir/$name"
             else
-                echo -e "${GREEN}updated${NC}"
-                updated=$((updated + 1))
+                echo "$name:updated" > "$tmpdir/$name"
             fi
-        fi
+        ) &
+        pids+=($!)
     done
+
+    for pid in "${pids[@]}"; do wait "$pid"; done
+
+    local updated=0 uptodate=0 failed=0
+    for f in "$tmpdir"/*; do
+        [[ -f "$f" ]] || continue
+        name=$(basename "$f")
+        status=$(cut -d: -f2 "$f")
+        case "$status" in
+            updated)  echo -e "${CYAN}⬇${NC}  $name... ${GREEN}updated${NC}";  updated=$((updated + 1)) ;;
+            uptodate) echo -e "${CYAN}⬇${NC}  $name... ${GREEN}up to date${NC}"; uptodate=$((uptodate + 1)) ;;
+            failed)   echo -e "${CYAN}⬇${NC}  $name... ${RED}failed${NC}";    failed=$((failed + 1)) ;;
+        esac
+    done
+    rm -rf "$tmpdir"
     div
     echo -e "  ${BOLD}Summary:${NC} ${GREEN}⬇ ${updated} updated${NC}, ${GREEN}✓ ${uptodate} up to date${NC}${failed:+, ${RED}✗ ${failed} failed${NC}}"
     div
