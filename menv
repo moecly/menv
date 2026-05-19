@@ -179,13 +179,12 @@ ensure_container() {
     local image="${config%%:*}"
     local home_dir="${config#*:}"
 
-    local cmd="distrobox-create --name $name --image $image --yes"
-    if [[ -n "$home_dir" ]]; then
-        cmd+=" --home $home_dir"
+    if [[ -z "$home_dir" ]]; then
+        home_dir="$BASE_DIR/distrobox/$name"
     fi
 
-    echo -e "${CYAN}Creating distrobox container:${NC} $name ($image)"
-    eval "$cmd"
+    echo -e "${CYAN}Creating distrobox container:${NC} $name ($image) home=$home_dir"
+    distrobox-create --name "$name" --image "$image" --home "$home_dir" --yes
 }
 
 dbx_exec() {
@@ -221,13 +220,12 @@ dbx_install_packages() {
     esac
 }
 
-check_host_conflict() {
+is_from_host() {
     local cmds="$1"
-    local dbx_export_path="${DISTROBOX_EXPORT_PATH:-$HOME/.local/bin}"
+    local dbx_export_path="${DISTROBOX_EXPORT_PATH:-$BASE_DIR/distrobox_bin}"
     for cmd in $cmds; do
         local path
         path=$(command -v "$cmd" 2>/dev/null) || continue
-        # skip if the found binary is inside distrobox export path
         if [[ "$path" != "${dbx_export_path}/"* ]]; then
             return 0
         fi
@@ -238,7 +236,7 @@ check_host_conflict() {
 dbx_export_bin() {
     local container="$1"
     local binary_path="$2"
-    local export_path="${DISTROBOX_EXPORT_PATH:-$HOME/.local/bin}"
+    local export_path="${DISTROBOX_EXPORT_PATH:-$BASE_DIR/distrobox_bin}"
 
     mkdir -p "$export_path"
     distrobox-export --container "$container" --bin "$binary_path" --export-path "$export_path"
@@ -409,9 +407,17 @@ cmd_doctor() {
         for t in "${cat_tools[@]}"; do
             IFS=: read -r source_field _cat type name cmds desc <<< "$t"
             parse_tool_source "$source_field"
+            local source_tag=""
+            if [[ "$TOOL_SOURCE" == "distrobox" ]]; then
+                source_tag=" [${source_field}]"
+            fi
             if [[ "$type" == "required" ]]; then
                 if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
-                    printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
+                    if [[ "$TOOL_SOURCE" == "distrobox" ]] && is_from_host "$cmds"; then
+                        printf "  ${GREEN}✓${NC}  %-${max_width}s ${YELLOW}(host)${NC}" "$name"
+                    else
+                        printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
+                    fi
                 else
                     printf "  ${RED}✗${NC}  %-${max_width}s ${RED}not found${NC}" "$name"
                     missing_required+=("$name:$desc:$source_field")
@@ -421,7 +427,11 @@ cmd_doctor() {
                     printf "  ${YELLOW}?${NC}  %-${max_width}s ${YELLOW}skip${NC}" "$name"
                 else
                     if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
-                        printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
+                        if [[ "$TOOL_SOURCE" == "distrobox" ]] && is_from_host "$cmds"; then
+                            printf "  ${GREEN}✓${NC}  %-${max_width}s ${YELLOW}(host)${NC}" "$name"
+                        else
+                            printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
+                        fi
                     else
                         printf "  ${YELLOW}⚠${NC}  %-${max_width}s ${YELLOW}not found${NC}" "$name"
                         missing_optional+=("$name:$desc:$source_field")
@@ -429,9 +439,9 @@ cmd_doctor() {
                 fi
             fi
             if [[ -n "$desc" ]]; then
-                echo -e " ${CYAN}($desc)${NC}"
+                echo -e " ${CYAN}($desc)${NC}${source_tag}"
             else
-                echo
+                echo -e "${source_tag}"
             fi
         done
         echo
@@ -558,10 +568,6 @@ do_install_pkgs() {
                 local to_export_mode=()
                 for entry in ${dbx_grouped[$container]}; do
                     IFS='|' read -r pkg cmds emode <<< "$entry"
-                    if check_host_conflict "$cmds"; then
-                        echo -e "  ${YELLOW}⚠${NC} $pkg already available on host, skipping distrobox install"
-                        continue
-                    fi
                     to_install+=("$pkg")
                     to_export_cmds+=("$cmds")
                     to_export_mode+=("$emode")
@@ -792,10 +798,6 @@ cmd_install() {
                 local to_export_mode=()
                 for entry in ${dbx_grouped[$container]}; do
                     IFS='|' read -r pkg cmds emode <<< "$entry"
-                    if check_host_conflict "$cmds"; then
-                        echo -e "  ${YELLOW}⚠${NC} $pkg already available on host, skipping distrobox install"
-                        continue
-                    fi
                     to_install+=("$pkg")
                     to_export_cmds+=("$cmds")
                     to_export_mode+=("$emode")
@@ -992,10 +994,11 @@ cmd_box() {
                 if container_exists "$name"; then
                     echo -e "  ${GREEN}✓${NC} $name (exists)"
                 else
+                    if [[ -z "$home_dir" ]]; then
+                        home_dir="$BASE_DIR/distrobox/$name"
+                    fi
                     echo -ne "  ${GREEN}+${NC} Creating $name ($image)... "
-                    local cmd="distrobox-create --name $name --image $image --yes"
-                    [[ -n "$home_dir" ]] && cmd+=" --home $home_dir"
-                    if eval "$cmd" >/dev/null 2>&1; then
+                    if distrobox-create --name "$name" --image "$image" --home "$home_dir" --yes >/dev/null 2>&1; then
                         echo -e "${GREEN}done${NC}"
                     else
                         echo -e "${RED}failed${NC}"
