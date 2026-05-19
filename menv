@@ -54,7 +54,7 @@ get_category_order() {
 get_max_name_length() {
     local max_len=0
     for item in "$@"; do
-        IFS=: read -r _source _cat _type name _cmds _desc <<< "$item"
+        IFS=: read -r _source _cat name _cmds _desc <<< "$item"
         len=${#name}
         ((len > max_len)) && max_len=$len
     done
@@ -206,7 +206,11 @@ cmd_list() {
     div
     echo -e "${BOLD}  ⬡  Repositories in ${BASE_DIR}${NC}"
     div
-    local width=$(get_max_name_length "${REPOS[@]}")
+    local width=0
+    for item in "${REPOS[@]}"; do
+        local rn="${item%%:*}"
+        (( ${#rn} > width )) && width=${#rn}
+    done
     for item in "${REPOS[@]}"; do
         name="${item%%:*}"
         repo_path="$BASE_DIR/$name"
@@ -229,8 +233,7 @@ cmd_doctor() {
     echo -e "${BOLD}  ⚙  Checking tools...${NC}"
     div
 
-    local missing_required=()
-    local missing_optional=()
+    local missing_tools=()
     local current_cat=""
     local cat_tools=()
     local max_width=0
@@ -241,25 +244,14 @@ cmd_doctor() {
         local label=$(get_category_label "$current_cat")
         echo -e "${BOLD}$label:${NC}"
         for t in "${cat_tools[@]}"; do
-            IFS=: read -r source _cat type name cmds desc <<< "$t"
-            if [[ "$type" == "required" ]]; then
-                if check_installed "$source" "$name" "$cmds"; then
-                    printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
-                else
-                    printf "  ${RED}✗${NC}  %-${max_width}s ${RED}not found${NC}" "$name"
-                    missing_required+=("$name:$desc:$source")
-                fi
+            IFS=: read -r source _cat name cmds desc <<< "$t"
+            if [[ -z "$cmds" && -z "$source" ]]; then
+                printf "  ${YELLOW}?${NC}  %-${max_width}s ${YELLOW}skip${NC}" "$name"
+            elif check_installed "$source" "$name" "$cmds"; then
+                printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
             else
-                if [[ -z "$cmds" && -z "$source" ]]; then
-                    printf "  ${YELLOW}?${NC}  %-${max_width}s ${YELLOW}skip${NC}" "$name"
-                else
-                    if check_installed "$source" "$name" "$cmds"; then
-                        printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
-                    else
-                        printf "  ${YELLOW}⚠${NC}  %-${max_width}s ${YELLOW}not found${NC}" "$name"
-                        missing_optional+=("$name:$desc:$source")
-                    fi
-                fi
+                printf "  ${YELLOW}⚠${NC}  %-${max_width}s ${YELLOW}not found${NC}" "$name"
+                missing_tools+=("$name:$desc:$source")
             fi
             if [[ -n "$desc" ]]; then
                 echo -e " ${CYAN}($desc)${NC}"
@@ -281,33 +273,84 @@ cmd_doctor() {
     done
     print_category
 
+    # Repo diagnostics
+    echo
+    div
+    echo -e "${BOLD}  ⚙  Checking repos...${NC}"
+    div
+
+    local repo_not_cloned=()
+    local repo_dirty=()
+    local repo_diverged=()
+    local repo_width=0
+    for item in "${REPOS[@]}"; do
+        local rn="${item%%:*}"
+        (( ${#rn} > repo_width )) && repo_width=${#rn}
+    done
+
+    for item in "${REPOS[@]}"; do
+        local rname="${item%%:*}"
+        local repo_path="$BASE_DIR/$rname"
+
+        if [[ ! -d "$repo_path/.git" ]]; then
+            printf "  ${RED}✗${NC}  %-${repo_width}s ${RED}not cloned${NC}" "$rname"
+            echo
+            repo_not_cloned+=("$rname")
+            continue
+        fi
+
+        cd "$repo_path"
+
+        local dirty=0 ahead=0 behind=0
+        if ! git diff --quiet HEAD 2>/dev/null; then
+            dirty=1
+        fi
+        ahead=$(git rev-list --count @{upstream}..HEAD 2>/dev/null || echo 0)
+        behind=$(git rev-list --count HEAD..@{upstream} 2>/dev/null || echo 0)
+
+        if [[ $dirty -eq 1 ]]; then
+            printf "  ${YELLOW}⚠${NC}  %-${repo_width}s ${YELLOW}dirty${NC}" "$rname"
+            echo
+            repo_dirty+=("$rname")
+        elif [[ $ahead -gt 0 || $behind -gt 0 ]]; then
+            local parts=""
+            [[ $ahead -gt 0 ]] && parts="ahead ${ahead}"
+            [[ $behind -gt 0 ]] && parts="${parts:+$parts / }behind ${behind}"
+            printf "  ${YELLOW}⚠${NC}  %-${repo_width}s ${YELLOW}%s${NC}" "$rname" "$parts"
+            echo
+            repo_diverged+=("$rname")
+        else
+            printf "  ${GREEN}✓${NC}  %-${repo_width}s ${GREEN}up to date${NC}" "$rname"
+            echo
+        fi
+
+        cd - > /dev/null
+    done
+
+    # Summary
     echo
     div
     echo -e "${BOLD}  Summary${NC}"
     div
 
-    echo -e "${BOLD}Missing Required:${NC}"
-    if [[ ${#missing_required[@]} -eq 0 ]]; then
-        echo -e "  ${GREEN}✓ All installed${NC}"
+    # Repo summary
+    local repo_issues=$(( ${#repo_not_cloned[@]} + ${#repo_dirty[@]} + ${#repo_diverged[@]} ))
+    if [[ $repo_issues -eq 0 ]]; then
+        echo -e "  ${GREEN}✓${NC} All repos OK"
     else
-        for tool in "${missing_required[@]}"; do
-            IFS=: read -r name desc source <<< "$tool"
-            local tag=""
-            [[ -n "$source" ]] && tag=" [$source]"
-            if [[ -n "$desc" ]]; then
-                echo -e "  ${RED}✗${NC} $name ${CYAN}($desc)${NC}${tag}"
-            else
-                echo -e "  ${RED}✗${NC} $name${tag}"
-            fi
-        done
+        [[ ${#repo_not_cloned[@]} -gt 0 ]] && echo -e "  ${RED}✗${NC} ${#repo_not_cloned[@]} not cloned: ${RED}${repo_not_cloned[*]}${NC}"
+        [[ ${#repo_dirty[@]} -gt 0 ]] && echo -e "  ${YELLOW}⚠${NC} ${#repo_dirty[@]} dirty: ${YELLOW}${repo_dirty[*]}${NC}"
+        [[ ${#repo_diverged[@]} -gt 0 ]] && echo -e "  ${YELLOW}⚠${NC} ${#repo_diverged[@]} diverged: ${YELLOW}${repo_diverged[*]}${NC}"
     fi
 
     echo
-    echo -e "${BOLD}Missing Optional:${NC}"
-    if [[ ${#missing_optional[@]} -eq 0 ]]; then
+
+    # Tool summary
+    echo -e "${BOLD}Missing Tools:${NC}"
+    if [[ ${#missing_tools[@]} -eq 0 ]]; then
         echo -e "  ${GREEN}✓ All installed${NC}"
     else
-        for tool in "${missing_optional[@]}"; do
+        for tool in "${missing_tools[@]}"; do
             IFS=: read -r name desc source <<< "$tool"
             local tag=""
             [[ -n "$source" ]] && tag=" [$source]"
@@ -334,7 +377,7 @@ do_install_pkgs() {
     for pkg in "${all_pkgs[@]}"; do
         local found=0
         for tool in "${TOOLS[@]}"; do
-            IFS=: read -r source _cat _type name _cmds _desc <<< "$tool"
+            IFS=: read -r source _cat name _cmds _desc <<< "$tool"
             if [[ "$name" == "$pkg" && "$source" == "aur" ]]; then
                 found=1
                 break
@@ -373,7 +416,7 @@ cmd_install_interactive() {
     local item_data=()
 
     for tool in "${TOOLS[@]}"; do
-        IFS=: read -r source cat type name cmds desc <<< "$tool"
+        IFS=: read -r source cat name cmds desc <<< "$tool"
         [[ -n "$category" && "$cat" != "$category" ]] && continue
         [[ -z "$source" ]] && continue
 
@@ -501,7 +544,7 @@ cmd_install() {
     div
 
     for tool in "${TOOLS[@]}"; do
-        IFS=: read -r source category type name cmds desc <<< "$tool"
+        IFS=: read -r source category name cmds desc <<< "$tool"
 
         if [[ -n "$target" && "$category" != "$target" ]]; then
             continue
@@ -588,13 +631,10 @@ cmd_status() {
 
     local tool_total=${#TOOLS[@]}
     local tool_installed=0
-    local missing_required=()
     for tool in "${TOOLS[@]}"; do
-        IFS=: read -r source category type name cmds desc <<< "$tool"
+        IFS=: read -r source category name cmds desc <<< "$tool"
         if check_installed "$source" "$name" "$cmds"; then
             tool_installed=$((tool_installed + 1))
-        elif [[ "$type" == "required" ]]; then
-            missing_required+=("$name")
         fi
     done
 
@@ -612,12 +652,6 @@ cmd_status() {
 
     local tool_bar=$(progressbar $tool_installed $tool_total 20)
     echo -e "  ${CYAN}⬡${NC} Tools:  ${CYAN}${tool_bar}${NC}  ${tool_installed}/${tool_total} installed"
-
-    if [[ ${#missing_required[@]} -eq 0 ]]; then
-        echo -e "  ${GREEN}✓${NC} All required tools installed"
-    else
-        echo -e "  ${RED}✗${NC} ${#missing_required[@]} required tools missing: ${RED}${missing_required[*]}${NC}"
-    fi
 
     div
 }
@@ -719,7 +753,7 @@ show_help() {
     echo -e "    ${GREEN}pull${NC}     Pull all repositories (including menv itself)"
     echo -e "    ${GREEN}list${NC}     List all repositories"
     echo -e "    ${GREEN}link${NC}     Execute link.sh in all repositories"
-    echo -e "    ${GREEN}doctor${NC}   Check required and optional tools"
+    echo -e "    ${GREEN}doctor${NC}   Check tools and repos"
     echo -e "    ${GREEN}status${NC}   Show quick overview (repos + tools)"
     echo -e "    ${GREEN}install${NC}  Install missing tools (pacman + AUR)"
     echo -e "           ${DIM}-i${NC}  Interactive select (fzf)"

@@ -29,18 +29,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `sh/` - 独立功能脚本（paru.sh, swapfile.sh, snapper.sh 等）
 - `config/` - 配置文件（都是 bash 变量声明）
   - `repos.conf` - dotfiles 仓库列表（克隆到 `$MOECLY_DIR`，默认 `~/.moecly_conf`）
-  - `tools.conf` - 工具列表（格式：`source:category:type:package:commands:description`）
+  - `tools.conf` - 工具列表（格式：`source:category:package:commands:description`）
   - `scripts.conf` - 可运行脚本注册
 
 ### 配置格式
 
 **TOOLS 格式**（tools.conf）:
 ```
-source:category:type:package:commands:description
+source:category:package:commands:description
 ```
 - source: `pacman` / `aur` / 空（无包源）
 - category: 英文别名（见 CATEGORY_ALIASES）
-- type: `required` / `optional`
 - package: 实际的包名
 - commands: 用于检测是否已安装的命令（空格分隔）
 
