@@ -189,6 +189,15 @@ ensure_container() {
 
     echo -e "${CYAN}Creating distrobox container:${NC} $name ($image) home=$home_dir"
     distrobox-create --name "$name" --image "$image" --home "$home_dir" --yes
+
+    # Auto-install paru in Arch-based containers
+    if dbx_exec "$name" command -v pacman >/dev/null 2>&1; then
+        if ! dbx_exec "$name" command -v paru >/dev/null 2>&1; then
+            echo -e "${CYAN}Installing paru in $name...${NC}"
+            dbx_exec "$name" sudo pacman -S --needed --noconfirm base-devel git
+            dbx_exec "$name" bash -c 'cd /tmp && rm -rf paru && git clone https://aur.archlinux.org/paru.git && (cd paru && makepkg -si --noconfirm) && rm -rf paru'
+        fi
+    fi
 }
 
 dbx_exec() {
@@ -219,8 +228,16 @@ dbx_install_packages() {
 }
 
 is_from_host() {
-    local cmds="$1"
+    local name="$1"
+    local cmds="$2"
     local dbx_export_path="${DISTROBOX_EXPORT_PATH:-$BASE_DIR/distrobox_bin}"
+
+    # Check pacman cache
+    if [[ -n "$PACMAN_CACHE" ]] && echo "$PACMAN_CACHE" | grep -q "^${name}$"; then
+        return 0
+    fi
+
+    # Check command availability outside distrobox export path
     for cmd in $cmds; do
         local path
         path=$(command -v "$cmd" 2>/dev/null) || continue
@@ -413,7 +430,7 @@ cmd_doctor() {
             fi
             if [[ "$TOOL_TYPE" == "required" ]]; then
                 if check_installed "$TOOL_PKG_MGR" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
-                    if [[ "$TOOL_CONTAINER" != "root" ]] && is_from_host "$cmds"; then
+                    if [[ "$TOOL_CONTAINER" != "root" ]] && is_from_host "$name" "$cmds"; then
                         printf "  ${GREEN}✓${NC}  %-${max_width}s ${YELLOW}(host)${NC}" "$name"
                     else
                         printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
@@ -427,7 +444,7 @@ cmd_doctor() {
                     printf "  ${YELLOW}?${NC}  %-${max_width}s ${YELLOW}skip${NC}" "$name"
                 else
                     if check_installed "$TOOL_PKG_MGR" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
-                        if [[ "$TOOL_CONTAINER" != "root" ]] && is_from_host "$cmds"; then
+                        if [[ "$TOOL_CONTAINER" != "root" ]] && is_from_host "$name" "$cmds"; then
                             printf "  ${GREEN}✓${NC}  %-${max_width}s ${YELLOW}(host)${NC}" "$name"
                         else
                             printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
@@ -563,7 +580,10 @@ do_install_pkgs() {
             for key in "${!dbx_grouped[@]}"; do
                 local container="${key%%:*}"
                 local pkg_mgr="${key#*:}"
-                ensure_container "$container"
+                if ! container_exists "$container"; then
+                    echo -e "${YELLOW}⚠ Container '$container' not found. Run ${CYAN}menv box setup${YELLOW} first.${NC}"
+                    continue
+                fi
                 local to_install=()
                 local to_export_cmds=()
                 local to_export_mode=()
@@ -796,7 +816,10 @@ cmd_install() {
             for key in "${!dbx_grouped[@]}"; do
                 local container="${key%%:*}"
                 local pkg_mgr="${key#*:}"
-                ensure_container "$container"
+                if ! container_exists "$container"; then
+                    echo -e "${YELLOW}⚠ Container '$container' not found. Run ${CYAN}menv box setup${YELLOW} first.${NC}"
+                    continue
+                fi
                 local to_install=()
                 local to_export_cmds=()
                 local to_export_mode=()
