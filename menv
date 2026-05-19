@@ -88,13 +88,13 @@ build_pacman_cache() {
 }
 
 check_installed() {
-    local source="$1"
+    local pkg_mgr="$1"
     local name="$2"
     local cmds="$3"
-    local container="${4:-}"
+    local container="${4:-root}"
     local export_mode="${5:-cli}"
 
-    if [[ -n "$source" && -n "$PACMAN_CACHE" ]]; then
+    if [[ -n "$pkg_mgr" && -n "$PACMAN_CACHE" ]]; then
         if echo "$PACMAN_CACHE" | grep -q "^${name}$"; then
             return 0
         fi
@@ -108,7 +108,7 @@ check_installed() {
         done
     fi
 
-    if [[ "$source" == "distrobox" && "$export_mode" == "none" && -n "$container" ]]; then
+    if [[ "$container" != "root" && "$export_mode" == "none" ]]; then
         if check_distrobox_available && container_exists "$container"; then
             local first_cmd="${cmds%% *}"
             if [[ -n "$first_cmd" ]] && dbx_exec "$container" which "$first_cmd" >/dev/null 2>&1; then
@@ -129,6 +129,7 @@ parse_tool_entry() {
     TOOL_SOURCE_FIELD=""
     TOOL_SOURCE=""
     TOOL_CONTAINER=""
+    TOOL_PKG_MGR=""
     TOOL_EXPORT=""
     TOOL_CATEGORY=""
     TOOL_TYPE=""
@@ -136,23 +137,15 @@ parse_tool_entry() {
     TOOL_CMDS=""
     TOOL_DESC=""
 
-    if [[ "$line" == "distrobox:"* ]]; then
-        TOOL_SOURCE="distrobox"
-        local rest="${line#distrobox:}"
-        TOOL_CONTAINER="${rest%%:*}"
-        rest="${rest#*:}"
-        local next="${rest%%:*}"
-        if [[ "$next" == "cli" || "$next" == "app" || "$next" == "none" ]]; then
-            TOOL_EXPORT="$next"
-            rest="${rest#*:}"
-        else
-            TOOL_EXPORT="cli"
-        fi
-        TOOL_SOURCE_FIELD="distrobox:${TOOL_CONTAINER}:${TOOL_EXPORT}"
-        IFS=: read -r TOOL_CATEGORY TOOL_TYPE TOOL_NAME TOOL_CMDS TOOL_DESC <<< "$rest"
+    # Format: target:pkg_mgr:export:category:type:package:commands:description
+    IFS=: read -r TOOL_CONTAINER TOOL_PKG_MGR TOOL_EXPORT TOOL_CATEGORY TOOL_TYPE TOOL_NAME TOOL_CMDS TOOL_DESC <<< "$line"
+
+    if [[ "$TOOL_CONTAINER" == "root" ]]; then
+        TOOL_SOURCE="$TOOL_PKG_MGR"
+        TOOL_SOURCE_FIELD="$TOOL_PKG_MGR"
     else
-        IFS=: read -r TOOL_SOURCE_FIELD TOOL_CATEGORY TOOL_TYPE TOOL_NAME TOOL_CMDS TOOL_DESC <<< "$line"
-        TOOL_SOURCE="$TOOL_SOURCE_FIELD"
+        TOOL_SOURCE="distrobox"
+        TOOL_SOURCE_FIELD="distrobox:${TOOL_CONTAINER}:${TOOL_PKG_MGR}:${TOOL_EXPORT}"
     fi
 }
 
@@ -206,28 +199,22 @@ dbx_exec() {
 
 dbx_install_packages() {
     local container="$1"
-    shift
+    local pkg_mgr="$2"
+    shift 2
     local pkgs=("$@")
 
     if [[ ${#pkgs[@]} -eq 0 ]]; then
         return
     fi
 
-    local pkg_mgr
-    pkg_mgr=$(dbx_exec "$container" sh -c '
-        command -v pacman 2>/dev/null && echo pacman && exit 0
-        command -v dnf    2>/dev/null && echo dnf    && exit 0
-        command -v apt-get 2>/dev/null && echo apt   && exit 0
-        echo unknown
-    ' 2>/dev/null)
-    pkg_mgr="${pkg_mgr%%[[:space:]]*}"
-
-    echo -e "${BOLD}Installing in container ${CYAN}$container${NC}: ${GREEN}${pkgs[*]}${NC}"
+    echo -e "${BOLD}Installing in container ${CYAN}$container${NC} via ${pkg_mgr}: ${GREEN}${pkgs[*]}${NC}"
     case "$pkg_mgr" in
         pacman) dbx_exec "$container" sudo pacman -S --needed --noconfirm "${pkgs[@]}" ;;
+        aur)    dbx_exec "$container" paru -S --needed --noconfirm "${pkgs[@]}" ;;
         dnf)    dbx_exec "$container" sudo dnf install -y "${pkgs[@]}" ;;
         apt)    dbx_exec "$container" sudo apt-get install -y "${pkgs[@]}" ;;
-        *)      echo -e "${RED}Error: Cannot detect package manager in $container${NC}" ;;
+        snap)   dbx_exec "$container" sudo snap install "${pkgs[@]}" ;;
+        *)      echo -e "${RED}Error: Unknown package manager '$pkg_mgr'${NC}" ;;
     esac
 }
 
@@ -421,33 +408,33 @@ cmd_doctor() {
             local cmds="$TOOL_CMDS"
             local desc="$TOOL_DESC"
             local source_tag=""
-            if [[ "$TOOL_SOURCE" == "distrobox" ]]; then
-                source_tag=" [${TOOL_SOURCE_FIELD}]"
+            if [[ "$TOOL_CONTAINER" != "root" ]]; then
+                source_tag=" [$TOOL_CONTAINER:$TOOL_PKG_MGR]"
             fi
             if [[ "$TOOL_TYPE" == "required" ]]; then
-                if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
-                    if [[ "$TOOL_SOURCE" == "distrobox" ]] && is_from_host "$cmds"; then
+                if check_installed "$TOOL_PKG_MGR" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
+                    if [[ "$TOOL_CONTAINER" != "root" ]] && is_from_host "$cmds"; then
                         printf "  ${GREEN}✓${NC}  %-${max_width}s ${YELLOW}(host)${NC}" "$name"
                     else
                         printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
                     fi
                 else
                     printf "  ${RED}✗${NC}  %-${max_width}s ${RED}not found${NC}" "$name"
-                    missing_required+=("$name|$desc|$TOOL_SOURCE_FIELD")
+                    missing_required+=("$name|$desc|$TOOL_CONTAINER:$TOOL_PKG_MGR")
                 fi
             else
-                if [[ -z "$cmds" && -z "$TOOL_SOURCE" ]]; then
+                if [[ -z "$cmds" && -z "$TOOL_PKG_MGR" ]]; then
                     printf "  ${YELLOW}?${NC}  %-${max_width}s ${YELLOW}skip${NC}" "$name"
                 else
-                    if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
-                        if [[ "$TOOL_SOURCE" == "distrobox" ]] && is_from_host "$cmds"; then
+                    if check_installed "$TOOL_PKG_MGR" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
+                        if [[ "$TOOL_CONTAINER" != "root" ]] && is_from_host "$cmds"; then
                             printf "  ${GREEN}✓${NC}  %-${max_width}s ${YELLOW}(host)${NC}" "$name"
                         else
                             printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
                         fi
                     else
                         printf "  ${YELLOW}⚠${NC}  %-${max_width}s ${YELLOW}not found${NC}" "$name"
-                        missing_optional+=("$name|$desc|$TOOL_SOURCE_FIELD")
+                        missing_optional+=("$name|$desc|$TOOL_CONTAINER:$TOOL_PKG_MGR")
                     fi
                 fi
             fi
@@ -517,6 +504,7 @@ do_install_pkgs() {
     local pacman_pkgs=()
     local dbx_pkgs=()
     local dbx_containers=()
+    local dbx_pkg_mgrs=()
     local dbx_cmds_list=()
     local dbx_export_list=()
 
@@ -534,12 +522,13 @@ do_install_pkgs() {
                 break
             fi
         done
-        if [[ "$TOOL_SOURCE" == "distrobox" ]]; then
+        if [[ "$TOOL_CONTAINER" != "root" ]]; then
             dbx_pkgs+=("$pkg")
             dbx_containers+=("$TOOL_CONTAINER")
+            dbx_pkg_mgrs+=("$TOOL_PKG_MGR")
             dbx_cmds_list+=("$found_cmds")
             dbx_export_list+=("$TOOL_EXPORT")
-        elif [[ "$TOOL_SOURCE" == "aur" ]]; then
+        elif [[ "$TOOL_PKG_MGR" == "aur" ]]; then
             aur_pkgs+=("$pkg")
         else
             pacman_pkgs+=("$pkg")
@@ -568,22 +557,24 @@ do_install_pkgs() {
         else
             declare -A dbx_grouped
             for i in "${!dbx_pkgs[@]}"; do
-                local key="${dbx_containers[$i]}"
+                local key="${dbx_containers[$i]}:${dbx_pkg_mgrs[$i]}"
                 dbx_grouped[$key]="${dbx_grouped[$key]} ${dbx_pkgs[$i]}|${dbx_cmds_list[$i]}|${dbx_export_list[$i]}"
             done
-            for container in "${!dbx_grouped[@]}"; do
+            for key in "${!dbx_grouped[@]}"; do
+                local container="${key%%:*}"
+                local pkg_mgr="${key#*:}"
                 ensure_container "$container"
                 local to_install=()
                 local to_export_cmds=()
                 local to_export_mode=()
-                for entry in ${dbx_grouped[$container]}; do
+                for entry in ${dbx_grouped[$key]}; do
                     IFS='|' read -r pkg cmds emode <<< "$entry"
                     to_install+=("$pkg")
                     to_export_cmds+=("$cmds")
                     to_export_mode+=("$emode")
                 done
                 if [[ ${#to_install[@]} -gt 0 ]]; then
-                    dbx_install_packages "$container" "${to_install[@]}"
+                    dbx_install_packages "$container" "$pkg_mgr" "${to_install[@]}"
                     for i in "${!to_install[@]}"; do
                         do_dbx_export "$container" "${to_install[$i]}" "${to_export_cmds[$i]}" "${to_export_mode[$i]}"
                     done
@@ -603,10 +594,10 @@ cmd_install_interactive() {
     for tool in "${TOOLS[@]}"; do
         parse_tool_entry "$tool"
         [[ -n "$category" && "$TOOL_CATEGORY" != "$category" ]] && continue
-        [[ -z "$TOOL_SOURCE" ]] && continue
+        [[ -z "$TOOL_PKG_MGR" ]] && continue
 
         local installed=0
-        if check_installed "$TOOL_SOURCE" "$TOOL_NAME" "$TOOL_CMDS" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
+        if check_installed "$TOOL_PKG_MGR" "$TOOL_NAME" "$TOOL_CMDS" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
             installed=1
         fi
 
@@ -616,12 +607,13 @@ cmd_install_interactive() {
 
         local cat_label
         cat_label=$(get_category_label "$TOOL_CATEGORY")
-        item_data+=("${installed}|${TOOL_NAME}|${TOOL_SOURCE_FIELD}")
+        local target_label="${TOOL_CONTAINER}:${TOOL_PKG_MGR}"
+        item_data+=("${installed}|${TOOL_NAME}|${target_label}")
 
         if [[ $installed -eq 1 ]]; then
-            fzf_input+=("$(printf '\033[2m%-30s \033[0m %-20s %-16s %s' "${TOOL_NAME} ✓" "${TOOL_SOURCE_FIELD}" "${cat_label}" "${TOOL_DESC}")")
+            fzf_input+=("$(printf '\033[2m%-30s \033[0m %-20s %-16s %s' "${TOOL_NAME} ✓" "${target_label}" "${cat_label}" "${TOOL_DESC}")")
         else
-            fzf_input+=("$(printf '%-30s %-20s %-16s %s' "${TOOL_NAME}" "${TOOL_SOURCE_FIELD}" "${cat_label}" "${TOOL_DESC}")")
+            fzf_input+=("$(printf '%-30s %-20s %-16s %s' "${TOOL_NAME}" "${target_label}" "${cat_label}" "${TOOL_DESC}")")
         fi
     done
 
@@ -722,6 +714,7 @@ cmd_install() {
     local aur_pkgs=()
     local dbx_pkgs=()
     local dbx_containers=()
+    local dbx_pkg_mgrs=()
     local dbx_cmds_list=()
     local dbx_export_list=()
     local current_cat=""
@@ -746,18 +739,19 @@ cmd_install() {
             has_output=1
         fi
 
-        if check_installed "$TOOL_SOURCE" "$TOOL_NAME" "$TOOL_CMDS" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
+        if check_installed "$TOOL_PKG_MGR" "$TOOL_NAME" "$TOOL_CMDS" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
             echo -e "  ${GREEN}✓${NC} $TOOL_NAME (already installed)"
-        elif [[ -z "$TOOL_SOURCE" ]]; then
+        elif [[ -z "$TOOL_PKG_MGR" ]]; then
             echo -e "  ${YELLOW}?${NC} $TOOL_NAME (no package source)${CYAN}($TOOL_DESC)${NC}"
         else
-            if [[ "$TOOL_SOURCE" == "distrobox" ]]; then
-                echo -e "  ${BLUE}+${NC} $TOOL_NAME [distrobox:$TOOL_CONTAINER]"
+            if [[ "$TOOL_CONTAINER" != "root" ]]; then
+                echo -e "  ${BLUE}+${NC} $TOOL_NAME [$TOOL_CONTAINER:$TOOL_PKG_MGR]"
                 dbx_pkgs+=("$TOOL_NAME")
                 dbx_containers+=("$TOOL_CONTAINER")
+                dbx_pkg_mgrs+=("$TOOL_PKG_MGR")
                 dbx_cmds_list+=("$TOOL_CMDS")
                 dbx_export_list+=("$TOOL_EXPORT")
-            elif [[ "$TOOL_SOURCE" == "aur" ]]; then
+            elif [[ "$TOOL_PKG_MGR" == "aur" ]]; then
                 echo -e "  ${YELLOW}+${NC} $TOOL_NAME [aur]"
                 aur_pkgs+=("$TOOL_NAME")
             else
@@ -796,22 +790,24 @@ cmd_install() {
         else
             declare -A dbx_grouped
             for i in "${!dbx_pkgs[@]}"; do
-                local key="${dbx_containers[$i]}"
+                local key="${dbx_containers[$i]}:${dbx_pkg_mgrs[$i]}"
                 dbx_grouped[$key]="${dbx_grouped[$key]} ${dbx_pkgs[$i]}|${dbx_cmds_list[$i]}|${dbx_export_list[$i]}"
             done
-            for container in "${!dbx_grouped[@]}"; do
+            for key in "${!dbx_grouped[@]}"; do
+                local container="${key%%:*}"
+                local pkg_mgr="${key#*:}"
                 ensure_container "$container"
                 local to_install=()
                 local to_export_cmds=()
                 local to_export_mode=()
-                for entry in ${dbx_grouped[$container]}; do
+                for entry in ${dbx_grouped[$key]}; do
                     IFS='|' read -r pkg cmds emode <<< "$entry"
                     to_install+=("$pkg")
                     to_export_cmds+=("$cmds")
                     to_export_mode+=("$emode")
                 done
                 if [[ ${#to_install[@]} -gt 0 ]]; then
-                    dbx_install_packages "$container" "${to_install[@]}"
+                    dbx_install_packages "$container" "$pkg_mgr" "${to_install[@]}"
                     for i in "${!to_install[@]}"; do
                         do_dbx_export "$container" "${to_install[$i]}" "${to_export_cmds[$i]}" "${to_export_mode[$i]}"
                     done
@@ -858,7 +854,7 @@ cmd_status() {
     local missing_required=()
     for tool in "${TOOLS[@]}"; do
         parse_tool_entry "$tool"
-        if check_installed "$TOOL_SOURCE" "$TOOL_NAME" "$TOOL_CMDS" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
+        if check_installed "$TOOL_PKG_MGR" "$TOOL_NAME" "$TOOL_CMDS" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
             tool_installed=$((tool_installed + 1))
         elif [[ "$TOOL_TYPE" == "required" ]]; then
             missing_required+=("$TOOL_NAME")

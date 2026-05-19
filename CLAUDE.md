@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-`menv` 是一个基于 Bash 的开发环境管理工具，支持 pacman、AUR 和 distrobox 安装方式。用于管理 dotfiles 仓库、系统工具安装和系统配置脚本。
+`menv` 是一个基于 Bash 的开发环境管理工具，支持宿主包管理器和 distrobox 容器安装。用于管理 dotfiles 仓库、系统工具安装和系统配置脚本。
 
 ## 常用命令
 
@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./menv link        # 执行各仓库中的 link.sh 脚本
 ./menv status      # 显示仓库和工具安装概览
 ./menv doctor      # 检查工具依赖是否满足
-./menv install     # 安装缺失的工具（pacman + AUR + distrobox）
+./menv install     # 安装缺失的工具
 ./menv install -i  # 交互式选择安装（fzf）
 ./menv install cli # 按分类安装
 ./menv box setup   # 创建所有配置的 distrobox 容器
@@ -33,19 +33,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `sh/` - 独立功能脚本（paru.sh, swapfile.sh, snapper.sh 等）
 - `config/` - 配置文件（都是 bash 变量声明）
   - `repos.conf` - dotfiles 仓库列表（克隆到 `$MOECLY_DIR`，默认 `~/.moecly_conf`）
-  - `tools.conf` - 工具列表（格式：`source[:container][:export]:category:type:package:commands:description`）
+  - `tools.conf` - 工具列表（统一 `target:pkg_mgr:export` 格式）
   - `scripts.conf` - 可运行脚本注册
-  - `distrobox.conf` - distrobox 容器定义（`DISTROBOX_CONTAINERS` 数组 + `DISTROBOX_EXPORT_PATH`）
+  - `distrobox.conf` - distrobox 容器定义
 
 ### 配置格式
 
 **TOOLS 格式**（tools.conf）:
 ```
-source[:container][:export]:category:type:package:commands:description
+target:pkg_mgr:export:category:type:package:commands:description
 ```
-- source: `pacman` / `aur` / `distrobox:<container>[:<export>]` / 空（无包源）
-- container: distrobox 容器名（定义在 distrobox.conf）
-- export: `cli`（导出二进制，默认）/ `app`（导出桌面应用）/ `none`（仅容器内）
+- target: `root`（宿主系统）或容器名（定义在 distrobox.conf）
+- pkg_mgr: `pacman` / `aur` / `dnf` / `apt` / `snap` 等
+- export: `cli`（导出二进制）/ `app`（导出桌面应用）/ `none`（仅容器内）
 - category: 英文别名（见 CATEGORY_ALIASES）
 - type: `required` / `optional`
 - package: 实际的包名
@@ -55,7 +55,7 @@ source[:container][:export]:category:type:package:commands:description
 ```
 name:image[:home_dir]
 ```
-- home_dir: 可选，空则共享宿主 $HOME，指定则使用独立 home
+- home_dir: 可选，空则默认 `$MOECLY_DIR/distrobox/<name>`，指定则覆盖
 
 **REPOS 格式**（repos.conf）:
 ```
@@ -70,4 +70,4 @@ alias:filename:description
 ### 环境变量
 
 - `MOECLY_DIR` - 覆盖默认的 `~/.moecly_conf` 路径
-- `DISTROBOX_EXPORT_PATH` - distrobox 二进制导出路径（默认 `~/.local/bin`）
+- `DISTROBOX_EXPORT_PATH` - distrobox 二进制导出路径（默认 `$MOECLY_DIR/distrobox_bin`）
