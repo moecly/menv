@@ -43,10 +43,10 @@ get_category_label() {
 get_category_order() {
     local -A seen
     for tool in "${TOOLS[@]}"; do
-        IFS=: read -r _src cat _rest <<< "$tool"
-        if [[ -z "${seen[$cat]}" ]]; then
-            seen[$cat]=1
-            echo "$cat"
+        parse_tool_entry "$tool"
+        if [[ -z "${seen[$TOOL_CATEGORY]}" ]]; then
+            seen[$TOOL_CATEGORY]=1
+            echo "$TOOL_CATEGORY"
         fi
     done
 }
@@ -54,8 +54,8 @@ get_category_order() {
 get_max_name_length() {
     local max_len=0
     for item in "$@"; do
-        IFS=: read -r _source _cat _type name _cmds _desc <<< "$item"
-        len=${#name}
+        parse_tool_entry "$item"
+        len=${#TOOL_NAME}
         ((len > max_len)) && max_len=$len
     done
     echo $max_len
@@ -94,7 +94,7 @@ check_installed() {
     local container="${4:-}"
     local export_mode="${5:-cli}"
 
-    if [[ -n "$source" && "$source" != "distrobox" && -n "$PACMAN_CACHE" ]]; then
+    if [[ -n "$source" && -n "$PACMAN_CACHE" ]]; then
         if echo "$PACMAN_CACHE" | grep -q "^${name}$"; then
             return 0
         fi
@@ -124,24 +124,35 @@ check_installed() {
 # Distrobox Helpers
 # ============================================================
 
-parse_tool_source() {
-    local source_field="$1"
+parse_tool_entry() {
+    local line="$1"
+    TOOL_SOURCE_FIELD=""
     TOOL_SOURCE=""
     TOOL_CONTAINER=""
     TOOL_EXPORT=""
+    TOOL_CATEGORY=""
+    TOOL_TYPE=""
+    TOOL_NAME=""
+    TOOL_CMDS=""
+    TOOL_DESC=""
 
-    if [[ "$source_field" == distrobox:* ]]; then
+    if [[ "$line" == "distrobox:"* ]]; then
         TOOL_SOURCE="distrobox"
-        local rest="${source_field#distrobox:}"
+        local rest="${line#distrobox:}"
         TOOL_CONTAINER="${rest%%:*}"
-        local after="${rest#*:}"
-        if [[ "$after" != "$rest" ]]; then
-            TOOL_EXPORT="$after"
+        rest="${rest#*:}"
+        local next="${rest%%:*}"
+        if [[ "$next" == "cli" || "$next" == "app" || "$next" == "none" ]]; then
+            TOOL_EXPORT="$next"
+            rest="${rest#*:}"
         else
             TOOL_EXPORT="cli"
         fi
+        TOOL_SOURCE_FIELD="distrobox:${TOOL_CONTAINER}:${TOOL_EXPORT}"
+        IFS=: read -r TOOL_CATEGORY TOOL_TYPE TOOL_NAME TOOL_CMDS TOOL_DESC <<< "$rest"
     else
-        TOOL_SOURCE="$source_field"
+        IFS=: read -r TOOL_SOURCE_FIELD TOOL_CATEGORY TOOL_TYPE TOOL_NAME TOOL_CMDS TOOL_DESC <<< "$line"
+        TOOL_SOURCE="$TOOL_SOURCE_FIELD"
     fi
 }
 
@@ -405,13 +416,15 @@ cmd_doctor() {
         local label=$(get_category_label "$current_cat")
         echo -e "${BOLD}$label:${NC}"
         for t in "${cat_tools[@]}"; do
-            IFS=: read -r source_field _cat type name cmds desc <<< "$t"
-            parse_tool_source "$source_field"
+            parse_tool_entry "$t"
+            local name="$TOOL_NAME"
+            local cmds="$TOOL_CMDS"
+            local desc="$TOOL_DESC"
             local source_tag=""
             if [[ "$TOOL_SOURCE" == "distrobox" ]]; then
-                source_tag=" [${source_field}]"
+                source_tag=" [${TOOL_SOURCE_FIELD}]"
             fi
-            if [[ "$type" == "required" ]]; then
+            if [[ "$TOOL_TYPE" == "required" ]]; then
                 if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
                     if [[ "$TOOL_SOURCE" == "distrobox" ]] && is_from_host "$cmds"; then
                         printf "  ${GREEN}✓${NC}  %-${max_width}s ${YELLOW}(host)${NC}" "$name"
@@ -420,7 +433,7 @@ cmd_doctor() {
                     fi
                 else
                     printf "  ${RED}✗${NC}  %-${max_width}s ${RED}not found${NC}" "$name"
-                    missing_required+=("$name:$desc:$source_field")
+                    missing_required+=("$name|$desc|$TOOL_SOURCE_FIELD")
                 fi
             else
                 if [[ -z "$cmds" && -z "$TOOL_SOURCE" ]]; then
@@ -434,7 +447,7 @@ cmd_doctor() {
                         fi
                     else
                         printf "  ${YELLOW}⚠${NC}  %-${max_width}s ${YELLOW}not found${NC}" "$name"
-                        missing_optional+=("$name:$desc:$source_field")
+                        missing_optional+=("$name|$desc|$TOOL_SOURCE_FIELD")
                     fi
                 fi
             fi
@@ -449,10 +462,10 @@ cmd_doctor() {
     }
 
     for tool in "${TOOLS[@]}"; do
-        IFS=: read -r _src tcat _rest <<< "$tool"
-        if [[ "$tcat" != "$current_cat" ]]; then
+        parse_tool_entry "$tool"
+        if [[ "$TOOL_CATEGORY" != "$current_cat" ]]; then
             print_category
-            current_cat="$tcat"
+            current_cat="$TOOL_CATEGORY"
         fi
         cat_tools+=("$tool")
     done
@@ -468,7 +481,7 @@ cmd_doctor() {
         echo -e "  ${GREEN}✓ All installed${NC}"
     else
         for tool in "${missing_required[@]}"; do
-            IFS=: read -r name desc source <<< "$tool"
+            IFS='|' read -r name desc source <<< "$tool"
             local tag=""
             [[ -n "$source" ]] && tag=" [$source]"
             if [[ -n "$desc" ]]; then
@@ -485,7 +498,7 @@ cmd_doctor() {
         echo -e "  ${GREEN}✓ All installed${NC}"
     else
         for tool in "${missing_optional[@]}"; do
-            IFS=: read -r name desc source <<< "$tool"
+            IFS='|' read -r name desc source <<< "$tool"
             local tag=""
             [[ -n "$source" ]] && tag=" [$source]"
             if [[ -n "$desc" ]]; then
@@ -513,17 +526,14 @@ do_install_pkgs() {
     fi
 
     for pkg in "${all_pkgs[@]}"; do
-        local found_source=""
         local found_cmds=""
         for tool in "${TOOLS[@]}"; do
-            IFS=: read -r source_field _cat _type name cmds _desc <<< "$tool"
-            if [[ "$name" == "$pkg" ]]; then
-                found_source="$source_field"
-                found_cmds="$cmds"
+            parse_tool_entry "$tool"
+            if [[ "$TOOL_NAME" == "$pkg" ]]; then
+                found_cmds="$TOOL_CMDS"
                 break
             fi
         done
-        parse_tool_source "$found_source"
         if [[ "$TOOL_SOURCE" == "distrobox" ]]; then
             dbx_pkgs+=("$pkg")
             dbx_containers+=("$TOOL_CONTAINER")
@@ -591,13 +601,12 @@ cmd_install_interactive() {
     local item_data=()
 
     for tool in "${TOOLS[@]}"; do
-        IFS=: read -r source_field cat type name cmds desc <<< "$tool"
-        parse_tool_source "$source_field"
-        [[ -n "$category" && "$cat" != "$category" ]] && continue
+        parse_tool_entry "$tool"
+        [[ -n "$category" && "$TOOL_CATEGORY" != "$category" ]] && continue
         [[ -z "$TOOL_SOURCE" ]] && continue
 
         local installed=0
-        if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
+        if check_installed "$TOOL_SOURCE" "$TOOL_NAME" "$TOOL_CMDS" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
             installed=1
         fi
 
@@ -606,13 +615,13 @@ cmd_install_interactive() {
         fi
 
         local cat_label
-        cat_label=$(get_category_label "$cat")
-        item_data+=("${installed}|${name}|${source_field}")
+        cat_label=$(get_category_label "$TOOL_CATEGORY")
+        item_data+=("${installed}|${TOOL_NAME}|${TOOL_SOURCE_FIELD}")
 
         if [[ $installed -eq 1 ]]; then
-            fzf_input+=("$(printf '\033[2m%-30s \033[0m %-20s %-16s %s' "${name} ✓" "${source_field}" "${cat_label}" "${desc}")")
+            fzf_input+=("$(printf '\033[2m%-30s \033[0m %-20s %-16s %s' "${TOOL_NAME} ✓" "${TOOL_SOURCE_FIELD}" "${cat_label}" "${TOOL_DESC}")")
         else
-            fzf_input+=("$(printf '%-30s %-20s %-16s %s' "${name}" "${source_field}" "${cat_label}" "${desc}")")
+            fzf_input+=("$(printf '%-30s %-20s %-16s %s' "${TOOL_NAME}" "${TOOL_SOURCE_FIELD}" "${cat_label}" "${TOOL_DESC}")")
         fi
     done
 
@@ -724,37 +733,36 @@ cmd_install() {
     div
 
     for tool in "${TOOLS[@]}"; do
-        IFS=: read -r source_field category type name cmds desc <<< "$tool"
-        parse_tool_source "$source_field"
+        parse_tool_entry "$tool"
 
-        if [[ -n "$target" && "$category" != "$target" ]]; then
+        if [[ -n "$target" && "$TOOL_CATEGORY" != "$target" ]]; then
             continue
         fi
 
-        if [[ "$category" != "$current_cat" ]]; then
+        if [[ "$TOOL_CATEGORY" != "$current_cat" ]]; then
             [[ $has_output -eq 1 ]] && echo
-            echo -e "${BOLD}$(get_category_label "$category"):${NC}"
-            current_cat="$category"
+            echo -e "${BOLD}$(get_category_label "$TOOL_CATEGORY"):${NC}"
+            current_cat="$TOOL_CATEGORY"
             has_output=1
         fi
 
-        if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
-            echo -e "  ${GREEN}✓${NC} $name (already installed)"
+        if check_installed "$TOOL_SOURCE" "$TOOL_NAME" "$TOOL_CMDS" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
+            echo -e "  ${GREEN}✓${NC} $TOOL_NAME (already installed)"
         elif [[ -z "$TOOL_SOURCE" ]]; then
-            echo -e "  ${YELLOW}?${NC} $name (no package source)${CYAN}($desc)${NC}"
+            echo -e "  ${YELLOW}?${NC} $TOOL_NAME (no package source)${CYAN}($TOOL_DESC)${NC}"
         else
             if [[ "$TOOL_SOURCE" == "distrobox" ]]; then
-                echo -e "  ${BLUE}+${NC} $name [distrobox:$TOOL_CONTAINER]"
-                dbx_pkgs+=("$name")
+                echo -e "  ${BLUE}+${NC} $TOOL_NAME [distrobox:$TOOL_CONTAINER]"
+                dbx_pkgs+=("$TOOL_NAME")
                 dbx_containers+=("$TOOL_CONTAINER")
-                dbx_cmds_list+=("$cmds")
+                dbx_cmds_list+=("$TOOL_CMDS")
                 dbx_export_list+=("$TOOL_EXPORT")
             elif [[ "$TOOL_SOURCE" == "aur" ]]; then
-                echo -e "  ${YELLOW}+${NC} $name [aur]"
-                aur_pkgs+=("$name")
+                echo -e "  ${YELLOW}+${NC} $TOOL_NAME [aur]"
+                aur_pkgs+=("$TOOL_NAME")
             else
-                echo -e "  ${GREEN}+${NC} $name [pacman]"
-                pacman_pkgs+=("$name")
+                echo -e "  ${GREEN}+${NC} $TOOL_NAME [pacman]"
+                pacman_pkgs+=("$TOOL_NAME")
             fi
         fi
     done
@@ -849,12 +857,11 @@ cmd_status() {
     local tool_installed=0
     local missing_required=()
     for tool in "${TOOLS[@]}"; do
-        IFS=: read -r source_field category type name cmds desc <<< "$tool"
-        parse_tool_source "$source_field"
-        if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
+        parse_tool_entry "$tool"
+        if check_installed "$TOOL_SOURCE" "$TOOL_NAME" "$TOOL_CMDS" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
             tool_installed=$((tool_installed + 1))
-        elif [[ "$type" == "required" ]]; then
-            missing_required+=("$name")
+        elif [[ "$TOOL_TYPE" == "required" ]]; then
+            missing_required+=("$TOOL_NAME")
         fi
     done
 
