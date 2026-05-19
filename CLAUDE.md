@@ -18,10 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./menv install     # 安装缺失的工具
 ./menv install -i  # 交互式选择安装（fzf）
 ./menv install cli # 按分类安装
-./menv box setup   # 创建所有配置的 distrobox 容器
-./menv box list    # 列出 distrobox 容器
-./menv box enter arch  # 进入容器
-./menv box upgrade # 升级所有容器
+./menv box        # 创建所有配置的 distrobox 容器
 ./menv run --list  # 列出可用脚本
 ./menv run paru    # 运行指定脚本
 ./menv protocol ssh|https  # 切换 Git 克隆协议

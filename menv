@@ -156,8 +156,19 @@ check_distrobox_available() {
 get_container_config() {
     local name="$1"
     for entry in "${DISTROBOX_CONTAINERS[@]}"; do
-        IFS=: read -r cname image home_dir <<< "$entry"
+        local cname="${entry%%:*}"
+        local rest="${entry#*:}"
         if [[ "$cname" == "$name" ]]; then
+            # rest is "image[:home_dir]", home_dir is after the *last* colon if it's a path
+            # count colons: 1 = image only, 2+ = image:tag, last segment = home_dir if it starts with /
+            local home_dir=""
+            local image="$rest"
+            # Check if last colon-separated segment looks like a path (starts with / or ~ or $)
+            local last="${rest##*:}"
+            if [[ "$last" =~ ^[/\$~] ]]; then
+                home_dir="$last"
+                image="${rest%:*}"
+            fi
             echo "$image:$home_dir"
             return 0
         fi
@@ -170,35 +181,6 @@ container_exists() {
     distrobox-list 2>/dev/null | awk '{print $3}' | grep -q "^${name}$"
 }
 
-ensure_container() {
-    local name="$1"
-    if container_exists "$name"; then
-        return 0
-    fi
-    local config
-    config=$(get_container_config "$name") || {
-        echo -e "${RED}Error: No image defined for container '$name'${NC}"
-        return 1
-    }
-    local image="${config%%:*}"
-    local home_dir="${config#*:}"
-
-    if [[ -z "$home_dir" ]]; then
-        home_dir="$BASE_DIR/distrobox/$name"
-    fi
-
-    echo -e "${CYAN}Creating distrobox container:${NC} $name ($image) home=$home_dir"
-    distrobox-create --name "$name" --image "$image" --home "$home_dir" --yes
-
-    # Auto-install paru in Arch-based containers
-    if dbx_exec "$name" command -v pacman >/dev/null 2>&1; then
-        if ! dbx_exec "$name" command -v paru >/dev/null 2>&1; then
-            echo -e "${CYAN}Installing paru in $name...${NC}"
-            dbx_exec "$name" sudo pacman -S --needed --noconfirm base-devel git
-            dbx_exec "$name" bash -c 'cd /tmp && rm -rf paru && git clone https://aur.archlinux.org/paru.git && (cd paru && makepkg -si --noconfirm) && rm -rf paru'
-        fi
-    fi
-}
 
 dbx_exec() {
     local container="$1"
@@ -254,13 +236,19 @@ dbx_export_bin() {
     local export_path="${DISTROBOX_EXPORT_PATH:-$BASE_DIR/distrobox_bin}"
 
     mkdir -p "$export_path"
-    distrobox-export --container "$container" --bin "$binary_path" --export-path "$export_path"
+    dbx_exec "$container" distrobox-export --bin "$binary_path" --export-path "$export_path"
 }
 
 dbx_export_app() {
     local container="$1"
-    local app_name="$2"
-    distrobox-export --container "$container" --app "$app_name"
+    local package="$2"
+    local desktop
+    desktop=$(dbx_exec "$container" bash -c "find /usr/share/applications -name '*.desktop' 2>/dev/null | grep -i '${package}' | head -1" 2>/dev/null)
+    if [[ -z "$desktop" ]]; then
+        echo -e "${YELLOW}Warning: No desktop file found for $package, skipping app export${NC}"
+        return
+    fi
+    dbx_exec "$container" distrobox-export --app "$desktop"
 }
 
 do_dbx_export() {
@@ -994,91 +982,65 @@ cmd_run() {
 }
 
 cmd_box() {
-    local action="${1:-list}"
-    shift || true
+    echo
+    div
+    echo -e "${BOLD}  Setting up distrobox containers...${NC}"
+    div
+    for entry in "${DISTROBOX_CONTAINERS[@]}"; do
+        local name="${entry%%:*}"
+        local rest="${entry#*:}"
+        local home_dir=""
+        local image="$rest"
+        local last="${rest##*:}"
+        if [[ "$last" =~ ^[/\$~] ]]; then
+            home_dir="$last"
+            image="${rest%:*}"
+        fi
+        local created=0
+        if container_exists "$name"; then
+            echo -e "  ${GREEN}✓${NC} $name (exists)"
+        else
+            if [[ -z "$home_dir" ]]; then
+                home_dir="$BASE_DIR/distrobox/$name"
+            fi
+            echo -ne "  ${GREEN}+${NC} Creating $name ($image)... "
+            if distrobox-create --name "$name" --image "$image" --home "$home_dir" --yes; then
+                echo -e "${GREEN}done${NC}"
+                created=1
+            else
+                echo -e "${RED}failed${NC}"
+            fi
+        fi
 
-    case "$action" in
-        list|ls)
-            echo
-            div
-            echo -e "${BOLD}  Distrobox Containers${NC}"
-            div
-            if check_distrobox_available; then
-                distrobox-list
+        # Ensure container is started and initialized
+        if container_exists "$name"; then
+            echo -ne "  ${CYAN}→${NC} Initializing $name... "
+            if dbx_exec "$name" true 2>/dev/null; then
+                echo -e "${GREEN}done${NC}"
             else
-                echo -e "  ${YELLOW}distrobox not installed${NC}"
+                echo -e "${YELLOW}skip (container not running)${NC}"
+                continue
             fi
-            div
-            ;;
-        setup)
-            echo
-            div
-            echo -e "${BOLD}  Setting up distrobox containers...${NC}"
-            div
-            for entry in "${DISTROBOX_CONTAINERS[@]}"; do
-                IFS=: read -r name image home_dir <<< "$entry"
-                if container_exists "$name"; then
-                    echo -e "  ${GREEN}✓${NC} $name (exists)"
-                else
-                    if [[ -z "$home_dir" ]]; then
-                        home_dir="$BASE_DIR/distrobox/$name"
-                    fi
-                    echo -ne "  ${GREEN}+${NC} Creating $name ($image)... "
-                    if distrobox-create --name "$name" --image "$image" --home "$home_dir" --yes >/dev/null 2>&1; then
-                        echo -e "${GREEN}done${NC}"
-                    else
-                        echo -e "${RED}failed${NC}"
-                    fi
+
+            # Update mirrorlist for Arch-based containers
+            if dbx_exec "$name" bash -c 'command -v pacman' >/dev/null 2>&1; then
+                echo -ne "  ${CYAN}→${NC} Updating mirrorlist in $name... "
+                dbx_exec "$name" sudo pacman -S --needed --noconfirm reflector >/dev/null 2>&1
+                dbx_exec "$name" sudo reflector --country "China" --protocol https --latest 10 --sort rate --save /etc/pacman.d/mirrorlist >/dev/null 2>&1
+                dbx_exec "$name" sudo pacman -Sy >/dev/null 2>&1
+                echo -e "${GREEN}done${NC}"
+            fi
+
+            # Auto-install paru in Arch-based containers
+            if dbx_exec "$name" bash -c 'command -v pacman' >/dev/null 2>&1; then
+                if ! dbx_exec "$name" bash -c 'command -v paru' >/dev/null 2>&1; then
+                    echo -e "  ${CYAN}→${NC} Installing paru in $name..."
+                    dbx_exec "$name" bash < "$SCRIPT_DIR/sh/paru.sh"
                 fi
-            done
-            div
-            ;;
-        create)
-            local name="$1"
-            if [[ -z "$name" ]]; then
-                echo -e "${RED}Usage: menv box create <name>${NC}"
-                return 1
             fi
-            ensure_container "$name"
-            ;;
-        enter)
-            local name="$1"
-            if [[ -z "$name" ]]; then
-                echo -e "${RED}Usage: menv box enter <name>${NC}"
-                return 1
-            fi
-            distrobox-enter --name "$name"
-            ;;
-        stop)
-            local name="$1"
-            if [[ -z "$name" ]]; then
-                echo -e "${RED}Usage: menv box stop <name>${NC}"
-                return 1
-            fi
-            distrobox-stop --name "$name"
-            ;;
-        rm|remove)
-            local name="$1"
-            if [[ -z "$name" ]]; then
-                echo -e "${RED}Usage: menv box rm <name>${NC}"
-                return 1
-            fi
-            distrobox-rm --name "$name" --force
-            ;;
-        upgrade)
-            local name="$1"
-            if [[ -z "$name" ]]; then
-                distrobox-upgrade --all
-            else
-                distrobox-upgrade "$name"
-            fi
-            ;;
-        *)
-            echo -e "${RED}Unknown action: $action${NC}"
-            echo "Usage: menv box [list|setup|create|enter|stop|rm|upgrade]"
-            return 1
-            ;;
-    esac
+        fi
+    done
+    div
 }
 
 show_help() {
@@ -1099,13 +1061,7 @@ show_help() {
     echo -e "           ${DIM}-i${NC}  Interactive select (fzf)"
     echo -e "           ${DIM}-a${NC}  Show all (including installed)"
     echo -e "           ${DIM}<category>${NC}  Install specific category"
-    echo -e "    ${GREEN}box${NC}       Manage distrobox containers"
-    echo -e "           ${DIM}list${NC}              List containers"
-    echo -e "           ${DIM}setup${NC}             Create all configured containers"
-    echo -e "           ${DIM}enter <name>${NC}      Enter a container"
-    echo -e "           ${DIM}stop <name>${NC}       Stop a container"
-    echo -e "           ${DIM}rm <name>${NC}         Remove a container"
-    echo -e "           ${DIM}upgrade [name]${NC}    Upgrade container(s)"
+    echo -e "    ${GREEN}box${NC}       Create distrobox containers from config"
     echo -e "    ${GREEN}run${NC}       Run setup scripts from sh/ directory"
     echo -e "    ${GREEN}protocol${NC}  Switch clone protocol (https|ssh)"
     echo
@@ -1122,9 +1078,7 @@ show_help() {
     echo "    menv install -i"
     echo "    menv install -i wayland"
     echo "    menv install -i -a"
-    echo "    menv box setup"
-    echo "    menv box enter arch"
-    echo "    menv box upgrade"
+    echo "    menv box"
     echo "    menv run"
     echo "    menv run paru"
     echo "    menv run swapfile 24"
