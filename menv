@@ -91,8 +91,10 @@ check_installed() {
     local source="$1"
     local name="$2"
     local cmds="$3"
+    local container="${4:-}"
+    local export_mode="${5:-cli}"
 
-    if [[ -n "$source" && -n "$PACMAN_CACHE" ]]; then
+    if [[ -n "$source" && "$source" != "distrobox" && -n "$PACMAN_CACHE" ]]; then
         if echo "$PACMAN_CACHE" | grep -q "^${name}$"; then
             return 0
         fi
@@ -106,7 +108,171 @@ check_installed() {
         done
     fi
 
+    if [[ "$source" == "distrobox" && "$export_mode" == "none" && -n "$container" ]]; then
+        if check_distrobox_available && container_exists "$container"; then
+            local first_cmd="${cmds%% *}"
+            if [[ -n "$first_cmd" ]] && dbx_exec "$container" which "$first_cmd" >/dev/null 2>&1; then
+                return 0
+            fi
+        fi
+    fi
+
     return 1
+}
+
+# ============================================================
+# Distrobox Helpers
+# ============================================================
+
+parse_tool_source() {
+    local source_field="$1"
+    TOOL_SOURCE=""
+    TOOL_CONTAINER=""
+    TOOL_EXPORT=""
+
+    if [[ "$source_field" == distrobox:* ]]; then
+        TOOL_SOURCE="distrobox"
+        local rest="${source_field#distrobox:}"
+        TOOL_CONTAINER="${rest%%:*}"
+        local after="${rest#*:}"
+        if [[ "$after" != "$rest" ]]; then
+            TOOL_EXPORT="$after"
+        else
+            TOOL_EXPORT="cli"
+        fi
+    else
+        TOOL_SOURCE="$source_field"
+    fi
+}
+
+check_distrobox_available() {
+    command -v distrobox >/dev/null 2>&1
+}
+
+get_container_config() {
+    local name="$1"
+    for entry in "${DISTROBOX_CONTAINERS[@]}"; do
+        IFS=: read -r cname image home_dir <<< "$entry"
+        if [[ "$cname" == "$name" ]]; then
+            echo "$image:$home_dir"
+            return 0
+        fi
+    done
+    return 1
+}
+
+container_exists() {
+    local name="$1"
+    distrobox-list 2>/dev/null | awk '{print $3}' | grep -q "^${name}$"
+}
+
+ensure_container() {
+    local name="$1"
+    if container_exists "$name"; then
+        return 0
+    fi
+    local config
+    config=$(get_container_config "$name") || {
+        echo -e "${RED}Error: No image defined for container '$name'${NC}"
+        return 1
+    }
+    local image="${config%%:*}"
+    local home_dir="${config#*:}"
+
+    local cmd="distrobox-create --name $name --image $image --yes"
+    if [[ -n "$home_dir" ]]; then
+        cmd+=" --home $home_dir"
+    fi
+
+    echo -e "${CYAN}Creating distrobox container:${NC} $name ($image)"
+    eval "$cmd"
+}
+
+dbx_exec() {
+    local container="$1"
+    shift
+    distrobox-enter --name "$container" -- "$@"
+}
+
+dbx_install_packages() {
+    local container="$1"
+    shift
+    local pkgs=("$@")
+
+    if [[ ${#pkgs[@]} -eq 0 ]]; then
+        return
+    fi
+
+    local pkg_mgr
+    pkg_mgr=$(dbx_exec "$container" sh -c '
+        command -v pacman 2>/dev/null && echo pacman && exit 0
+        command -v dnf    2>/dev/null && echo dnf    && exit 0
+        command -v apt-get 2>/dev/null && echo apt   && exit 0
+        echo unknown
+    ' 2>/dev/null)
+    pkg_mgr="${pkg_mgr%%[[:space:]]*}"
+
+    echo -e "${BOLD}Installing in container ${CYAN}$container${NC}: ${GREEN}${pkgs[*]}${NC}"
+    case "$pkg_mgr" in
+        pacman) dbx_exec "$container" sudo pacman -S --needed --noconfirm "${pkgs[@]}" ;;
+        dnf)    dbx_exec "$container" sudo dnf install -y "${pkgs[@]}" ;;
+        apt)    dbx_exec "$container" sudo apt-get install -y "${pkgs[@]}" ;;
+        *)      echo -e "${RED}Error: Cannot detect package manager in $container${NC}" ;;
+    esac
+}
+
+check_host_conflict() {
+    local cmds="$1"
+    local dbx_export_path="${DISTROBOX_EXPORT_PATH:-$HOME/.local/bin}"
+    for cmd in $cmds; do
+        local path
+        path=$(command -v "$cmd" 2>/dev/null) || continue
+        # skip if the found binary is inside distrobox export path
+        if [[ "$path" != "${dbx_export_path}/"* ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+dbx_export_bin() {
+    local container="$1"
+    local binary_path="$2"
+    local export_path="${DISTROBOX_EXPORT_PATH:-$HOME/.local/bin}"
+
+    mkdir -p "$export_path"
+    distrobox-export --container "$container" --bin "$binary_path" --export-path "$export_path"
+}
+
+dbx_export_app() {
+    local container="$1"
+    local app_name="$2"
+    distrobox-export --container "$container" --app "$app_name"
+}
+
+do_dbx_export() {
+    local container="$1"
+    local package="$2"
+    local cmds="$3"
+    local export_mode="$4"
+
+    if [[ "$export_mode" == "none" ]]; then
+        return 0
+    fi
+
+    if [[ "$export_mode" == "app" ]]; then
+        dbx_export_app "$container" "$package"
+        return
+    fi
+
+    local first_cmd="${cmds%% *}"
+    if [[ -n "$first_cmd" ]]; then
+        local bin_path
+        bin_path=$(dbx_exec "$container" which "$first_cmd" 2>/dev/null)
+        if [[ -n "$bin_path" ]]; then
+            dbx_export_bin "$container" "$bin_path"
+        fi
+    fi
 }
 
 # ============================================================
@@ -241,23 +407,24 @@ cmd_doctor() {
         local label=$(get_category_label "$current_cat")
         echo -e "${BOLD}$label:${NC}"
         for t in "${cat_tools[@]}"; do
-            IFS=: read -r source _cat type name cmds desc <<< "$t"
+            IFS=: read -r source_field _cat type name cmds desc <<< "$t"
+            parse_tool_source "$source_field"
             if [[ "$type" == "required" ]]; then
-                if check_installed "$source" "$name" "$cmds"; then
+                if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
                     printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
                 else
                     printf "  ${RED}✗${NC}  %-${max_width}s ${RED}not found${NC}" "$name"
-                    missing_required+=("$name:$desc:$source")
+                    missing_required+=("$name:$desc:$source_field")
                 fi
             else
-                if [[ -z "$cmds" && -z "$source" ]]; then
+                if [[ -z "$cmds" && -z "$TOOL_SOURCE" ]]; then
                     printf "  ${YELLOW}?${NC}  %-${max_width}s ${YELLOW}skip${NC}" "$name"
                 else
-                    if check_installed "$source" "$name" "$cmds"; then
+                    if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
                         printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
                     else
                         printf "  ${YELLOW}⚠${NC}  %-${max_width}s ${YELLOW}not found${NC}" "$name"
-                        missing_optional+=("$name:$desc:$source")
+                        missing_optional+=("$name:$desc:$source_field")
                     fi
                 fi
             fi
@@ -325,6 +492,10 @@ do_install_pkgs() {
     local all_pkgs=("$@")
     local aur_pkgs=()
     local pacman_pkgs=()
+    local dbx_pkgs=()
+    local dbx_containers=()
+    local dbx_cmds_list=()
+    local dbx_export_list=()
 
     if [[ ${#all_pkgs[@]} -eq 0 ]]; then
         echo -e "${GREEN}No packages to install.${NC}"
@@ -332,15 +503,23 @@ do_install_pkgs() {
     fi
 
     for pkg in "${all_pkgs[@]}"; do
-        local found=0
+        local found_source=""
+        local found_cmds=""
         for tool in "${TOOLS[@]}"; do
-            IFS=: read -r source _cat _type name _cmds _desc <<< "$tool"
-            if [[ "$name" == "$pkg" && "$source" == "aur" ]]; then
-                found=1
+            IFS=: read -r source_field _cat _type name cmds _desc <<< "$tool"
+            if [[ "$name" == "$pkg" ]]; then
+                found_source="$source_field"
+                found_cmds="$cmds"
                 break
             fi
         done
-        if [[ $found -eq 1 ]]; then
+        parse_tool_source "$found_source"
+        if [[ "$TOOL_SOURCE" == "distrobox" ]]; then
+            dbx_pkgs+=("$pkg")
+            dbx_containers+=("$TOOL_CONTAINER")
+            dbx_cmds_list+=("$found_cmds")
+            dbx_export_list+=("$TOOL_EXPORT")
+        elif [[ "$TOOL_SOURCE" == "aur" ]]; then
             aur_pkgs+=("$pkg")
         else
             pacman_pkgs+=("$pkg")
@@ -363,6 +542,39 @@ do_install_pkgs() {
             paru -S --needed --noconfirm "${aur_pkgs[@]}"
         fi
     fi
+    if [[ ${#dbx_pkgs[@]} -gt 0 ]]; then
+        if ! check_distrobox_available; then
+            echo -e "${RED}Error: distrobox not found. Install distrobox first.${NC}"
+        else
+            declare -A dbx_grouped
+            for i in "${!dbx_pkgs[@]}"; do
+                local key="${dbx_containers[$i]}"
+                dbx_grouped[$key]="${dbx_grouped[$key]} ${dbx_pkgs[$i]}|${dbx_cmds_list[$i]}|${dbx_export_list[$i]}"
+            done
+            for container in "${!dbx_grouped[@]}"; do
+                ensure_container "$container"
+                local to_install=()
+                local to_export_cmds=()
+                local to_export_mode=()
+                for entry in ${dbx_grouped[$container]}; do
+                    IFS='|' read -r pkg cmds emode <<< "$entry"
+                    if check_host_conflict "$cmds"; then
+                        echo -e "  ${YELLOW}⚠${NC} $pkg already available on host, skipping distrobox install"
+                        continue
+                    fi
+                    to_install+=("$pkg")
+                    to_export_cmds+=("$cmds")
+                    to_export_mode+=("$emode")
+                done
+                if [[ ${#to_install[@]} -gt 0 ]]; then
+                    dbx_install_packages "$container" "${to_install[@]}"
+                    for i in "${!to_install[@]}"; do
+                        do_dbx_export "$container" "${to_install[$i]}" "${to_export_cmds[$i]}" "${to_export_mode[$i]}"
+                    done
+                fi
+            done
+        fi
+    fi
 }
 
 cmd_install_interactive() {
@@ -373,12 +585,13 @@ cmd_install_interactive() {
     local item_data=()
 
     for tool in "${TOOLS[@]}"; do
-        IFS=: read -r source cat type name cmds desc <<< "$tool"
+        IFS=: read -r source_field cat type name cmds desc <<< "$tool"
+        parse_tool_source "$source_field"
         [[ -n "$category" && "$cat" != "$category" ]] && continue
-        [[ -z "$source" ]] && continue
+        [[ -z "$TOOL_SOURCE" ]] && continue
 
         local installed=0
-        if check_installed "$source" "$name" "$cmds"; then
+        if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
             installed=1
         fi
 
@@ -388,12 +601,12 @@ cmd_install_interactive() {
 
         local cat_label
         cat_label=$(get_category_label "$cat")
-        item_data+=("${installed}|${name}|${source}")
+        item_data+=("${installed}|${name}|${source_field}")
 
         if [[ $installed -eq 1 ]]; then
-            fzf_input+=("$(printf '\033[2m%-30s \033[0m %-6s %-16s %s' "${name} ✓" "${source}" "${cat_label}" "${desc}")")
+            fzf_input+=("$(printf '\033[2m%-30s \033[0m %-20s %-16s %s' "${name} ✓" "${source_field}" "${cat_label}" "${desc}")")
         else
-            fzf_input+=("$(printf '%-30s %-6s %-16s %s' "${name}" "${source}" "${cat_label}" "${desc}")")
+            fzf_input+=("$(printf '%-30s %-20s %-16s %s' "${name}" "${source_field}" "${cat_label}" "${desc}")")
         fi
     done
 
@@ -492,6 +705,10 @@ cmd_install() {
 
     local pacman_pkgs=()
     local aur_pkgs=()
+    local dbx_pkgs=()
+    local dbx_containers=()
+    local dbx_cmds_list=()
+    local dbx_export_list=()
     local current_cat=""
     local has_output=0
 
@@ -501,7 +718,8 @@ cmd_install() {
     div
 
     for tool in "${TOOLS[@]}"; do
-        IFS=: read -r source category type name cmds desc <<< "$tool"
+        IFS=: read -r source_field category type name cmds desc <<< "$tool"
+        parse_tool_source "$source_field"
 
         if [[ -n "$target" && "$category" != "$target" ]]; then
             continue
@@ -514,12 +732,18 @@ cmd_install() {
             has_output=1
         fi
 
-        if check_installed "$source" "$name" "$cmds"; then
+        if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
             echo -e "  ${GREEN}✓${NC} $name (already installed)"
-        elif [[ -z "$source" ]]; then
+        elif [[ -z "$TOOL_SOURCE" ]]; then
             echo -e "  ${YELLOW}?${NC} $name (no package source)${CYAN}($desc)${NC}"
         else
-            if [[ "$source" == "aur" ]]; then
+            if [[ "$TOOL_SOURCE" == "distrobox" ]]; then
+                echo -e "  ${BLUE}+${NC} $name [distrobox:$TOOL_CONTAINER]"
+                dbx_pkgs+=("$name")
+                dbx_containers+=("$TOOL_CONTAINER")
+                dbx_cmds_list+=("$cmds")
+                dbx_export_list+=("$TOOL_EXPORT")
+            elif [[ "$TOOL_SOURCE" == "aur" ]]; then
                 echo -e "  ${YELLOW}+${NC} $name [aur]"
                 aur_pkgs+=("$name")
             else
@@ -552,7 +776,40 @@ cmd_install() {
             paru -S --needed --noconfirm "${aur_pkgs[@]}"
         fi
     fi
-    if [[ ${#pacman_pkgs[@]} -eq 0 && ${#aur_pkgs[@]} -eq 0 ]]; then
+    if [[ ${#dbx_pkgs[@]} -gt 0 ]]; then
+        if ! check_distrobox_available; then
+            echo -e "${RED}Error: distrobox not found. Install distrobox first.${NC}"
+        else
+            declare -A dbx_grouped
+            for i in "${!dbx_pkgs[@]}"; do
+                local key="${dbx_containers[$i]}"
+                dbx_grouped[$key]="${dbx_grouped[$key]} ${dbx_pkgs[$i]}|${dbx_cmds_list[$i]}|${dbx_export_list[$i]}"
+            done
+            for container in "${!dbx_grouped[@]}"; do
+                ensure_container "$container"
+                local to_install=()
+                local to_export_cmds=()
+                local to_export_mode=()
+                for entry in ${dbx_grouped[$container]}; do
+                    IFS='|' read -r pkg cmds emode <<< "$entry"
+                    if check_host_conflict "$cmds"; then
+                        echo -e "  ${YELLOW}⚠${NC} $pkg already available on host, skipping distrobox install"
+                        continue
+                    fi
+                    to_install+=("$pkg")
+                    to_export_cmds+=("$cmds")
+                    to_export_mode+=("$emode")
+                done
+                if [[ ${#to_install[@]} -gt 0 ]]; then
+                    dbx_install_packages "$container" "${to_install[@]}"
+                    for i in "${!to_install[@]}"; do
+                        do_dbx_export "$container" "${to_install[$i]}" "${to_export_cmds[$i]}" "${to_export_mode[$i]}"
+                    done
+                fi
+            done
+        fi
+    fi
+    if [[ ${#pacman_pkgs[@]} -eq 0 && ${#aur_pkgs[@]} -eq 0 && ${#dbx_pkgs[@]} -eq 0 ]]; then
         echo -e "${GREEN}All tools already installed!${NC}"
     fi
     div
@@ -590,8 +847,9 @@ cmd_status() {
     local tool_installed=0
     local missing_required=()
     for tool in "${TOOLS[@]}"; do
-        IFS=: read -r source category type name cmds desc <<< "$tool"
-        if check_installed "$source" "$name" "$cmds"; then
+        IFS=: read -r source_field category type name cmds desc <<< "$tool"
+        parse_tool_source "$source_field"
+        if check_installed "$TOOL_SOURCE" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
             tool_installed=$((tool_installed + 1))
         elif [[ "$type" == "required" ]]; then
             missing_required+=("$name")
@@ -707,6 +965,93 @@ cmd_run() {
     return $exit_code
 }
 
+cmd_box() {
+    local action="${1:-list}"
+    shift || true
+
+    case "$action" in
+        list|ls)
+            echo
+            div
+            echo -e "${BOLD}  Distrobox Containers${NC}"
+            div
+            if check_distrobox_available; then
+                distrobox-list
+            else
+                echo -e "  ${YELLOW}distrobox not installed${NC}"
+            fi
+            div
+            ;;
+        setup)
+            echo
+            div
+            echo -e "${BOLD}  Setting up distrobox containers...${NC}"
+            div
+            for entry in "${DISTROBOX_CONTAINERS[@]}"; do
+                IFS=: read -r name image home_dir <<< "$entry"
+                if container_exists "$name"; then
+                    echo -e "  ${GREEN}✓${NC} $name (exists)"
+                else
+                    echo -ne "  ${GREEN}+${NC} Creating $name ($image)... "
+                    local cmd="distrobox-create --name $name --image $image --yes"
+                    [[ -n "$home_dir" ]] && cmd+=" --home $home_dir"
+                    if eval "$cmd" >/dev/null 2>&1; then
+                        echo -e "${GREEN}done${NC}"
+                    else
+                        echo -e "${RED}failed${NC}"
+                    fi
+                fi
+            done
+            div
+            ;;
+        create)
+            local name="$1"
+            if [[ -z "$name" ]]; then
+                echo -e "${RED}Usage: menv box create <name>${NC}"
+                return 1
+            fi
+            ensure_container "$name"
+            ;;
+        enter)
+            local name="$1"
+            if [[ -z "$name" ]]; then
+                echo -e "${RED}Usage: menv box enter <name>${NC}"
+                return 1
+            fi
+            distrobox-enter --name "$name"
+            ;;
+        stop)
+            local name="$1"
+            if [[ -z "$name" ]]; then
+                echo -e "${RED}Usage: menv box stop <name>${NC}"
+                return 1
+            fi
+            distrobox-stop --name "$name"
+            ;;
+        rm|remove)
+            local name="$1"
+            if [[ -z "$name" ]]; then
+                echo -e "${RED}Usage: menv box rm <name>${NC}"
+                return 1
+            fi
+            distrobox-rm --name "$name" --force
+            ;;
+        upgrade)
+            local name="$1"
+            if [[ -z "$name" ]]; then
+                distrobox-upgrade --all
+            else
+                distrobox-upgrade "$name"
+            fi
+            ;;
+        *)
+            echo -e "${RED}Unknown action: $action${NC}"
+            echo "Usage: menv box [list|setup|create|enter|stop|rm|upgrade]"
+            return 1
+            ;;
+    esac
+}
+
 show_help() {
     echo
     echo -e "${BOLD}menv${NC} - Development Environment Manager"
@@ -721,10 +1066,17 @@ show_help() {
     echo -e "    ${GREEN}link${NC}     Execute link.sh in all repositories"
     echo -e "    ${GREEN}doctor${NC}   Check required and optional tools"
     echo -e "    ${GREEN}status${NC}   Show quick overview (repos + tools)"
-    echo -e "    ${GREEN}install${NC}  Install missing tools (pacman + AUR)"
+    echo -e "    ${GREEN}install${NC}  Install missing tools (pacman + AUR + distrobox)"
     echo -e "           ${DIM}-i${NC}  Interactive select (fzf)"
     echo -e "           ${DIM}-a${NC}  Show all (including installed)"
     echo -e "           ${DIM}<category>${NC}  Install specific category"
+    echo -e "    ${GREEN}box${NC}       Manage distrobox containers"
+    echo -e "           ${DIM}list${NC}              List containers"
+    echo -e "           ${DIM}setup${NC}             Create all configured containers"
+    echo -e "           ${DIM}enter <name>${NC}      Enter a container"
+    echo -e "           ${DIM}stop <name>${NC}       Stop a container"
+    echo -e "           ${DIM}rm <name>${NC}         Remove a container"
+    echo -e "           ${DIM}upgrade [name]${NC}    Upgrade container(s)"
     echo -e "    ${GREEN}run${NC}       Run setup scripts from sh/ directory"
     echo -e "    ${GREEN}protocol${NC}  Switch clone protocol (https|ssh)"
     echo
@@ -741,6 +1093,9 @@ show_help() {
     echo "    menv install -i"
     echo "    menv install -i wayland"
     echo "    menv install -i -a"
+    echo "    menv box setup"
+    echo "    menv box enter arch"
+    echo "    menv box upgrade"
     echo "    menv run"
     echo "    menv run paru"
     echo "    menv run swapfile 24"
@@ -758,6 +1113,7 @@ main() {
         doctor) cmd_doctor ;;
         status) cmd_status ;;
         install) cmd_install "$@" ;;
+        box)     cmd_box "$@" ;;
         run)     cmd_run "$@" ;;
         protocol) cmd_protocol "$@" ;;
         help|--help|-h) show_help ;;
