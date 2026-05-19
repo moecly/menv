@@ -43,7 +43,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 target:pkg_mgr:export:category:type:package:commands:description
 ```
-- target: `root`（宿主系统）或容器名（定义在 distrobox.conf）
+- target: `host`（宿主系统）或容器名（定义在 distrobox.conf）
 - pkg_mgr: `pacman` / `aur` / `dnf` / `apt` / `snap` 等
 - export: `cli`（导出二进制）/ `app`（导出桌面应用）/ `none`（仅容器内）
 - category: 英文别名（见 CATEGORY_ALIASES）

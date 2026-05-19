@@ -91,7 +91,7 @@ check_installed() {
     local pkg_mgr="$1"
     local name="$2"
     local cmds="$3"
-    local container="${4:-root}"
+    local container="${4:-host}"
     local export_mode="${5:-cli}"
 
     if [[ -n "$pkg_mgr" && -n "$PACMAN_CACHE" ]]; then
@@ -108,7 +108,7 @@ check_installed() {
         done
     fi
 
-    if [[ "$container" != "root" && "$export_mode" == "none" ]]; then
+    if [[ "$container" != "host" && "$export_mode" == "none" ]]; then
         if check_distrobox_available && container_exists "$container"; then
             local first_cmd="${cmds%% *}"
             if [[ -n "$first_cmd" ]] && dbx_exec "$container" which "$first_cmd" >/dev/null 2>&1; then
@@ -140,7 +140,7 @@ parse_tool_entry() {
     # Format: target:pkg_mgr:export:category:type:package:commands:description
     IFS=: read -r TOOL_CONTAINER TOOL_PKG_MGR TOOL_EXPORT TOOL_CATEGORY TOOL_TYPE TOOL_NAME TOOL_CMDS TOOL_DESC <<< "$line"
 
-    if [[ "$TOOL_CONTAINER" == "root" ]]; then
+    if [[ "$TOOL_CONTAINER" == "host" ]]; then
         TOOL_SOURCE="$TOOL_PKG_MGR"
         TOOL_SOURCE_FIELD="$TOOL_PKG_MGR"
     else
@@ -425,12 +425,12 @@ cmd_doctor() {
             local cmds="$TOOL_CMDS"
             local desc="$TOOL_DESC"
             local source_tag=""
-            if [[ "$TOOL_CONTAINER" != "root" ]]; then
+            if [[ "$TOOL_CONTAINER" != "host" ]]; then
                 source_tag=" [$TOOL_CONTAINER:$TOOL_PKG_MGR]"
             fi
             if [[ "$TOOL_TYPE" == "required" ]]; then
                 if check_installed "$TOOL_PKG_MGR" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
-                    if [[ "$TOOL_CONTAINER" != "root" ]] && is_from_host "$name" "$cmds"; then
+                    if [[ "$TOOL_CONTAINER" != "host" ]] && is_from_host "$name" "$cmds"; then
                         printf "  ${GREEN}✓${NC}  %-${max_width}s ${YELLOW}(host)${NC}" "$name"
                     else
                         printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
@@ -444,7 +444,7 @@ cmd_doctor() {
                     printf "  ${YELLOW}?${NC}  %-${max_width}s ${YELLOW}skip${NC}" "$name"
                 else
                     if check_installed "$TOOL_PKG_MGR" "$name" "$cmds" "$TOOL_CONTAINER" "$TOOL_EXPORT"; then
-                        if [[ "$TOOL_CONTAINER" != "root" ]] && is_from_host "$name" "$cmds"; then
+                        if [[ "$TOOL_CONTAINER" != "host" ]] && is_from_host "$name" "$cmds"; then
                             printf "  ${GREEN}✓${NC}  %-${max_width}s ${YELLOW}(host)${NC}" "$name"
                         else
                             printf "  ${GREEN}✓${NC}  %-${max_width}s ${GREEN}found${NC}" "$name"
@@ -539,7 +539,7 @@ do_install_pkgs() {
                 break
             fi
         done
-        if [[ "$TOOL_CONTAINER" != "root" ]]; then
+        if [[ "$TOOL_CONTAINER" != "host" ]]; then
             dbx_pkgs+=("$pkg")
             dbx_containers+=("$TOOL_CONTAINER")
             dbx_pkg_mgrs+=("$TOOL_PKG_MGR")
@@ -764,7 +764,7 @@ cmd_install() {
         elif [[ -z "$TOOL_PKG_MGR" ]]; then
             echo -e "  ${YELLOW}?${NC} $TOOL_NAME (no package source)${CYAN}($TOOL_DESC)${NC}"
         else
-            if [[ "$TOOL_CONTAINER" != "root" ]]; then
+            if [[ "$TOOL_CONTAINER" != "host" ]]; then
                 echo -e "  ${BLUE}+${NC} $TOOL_NAME [$TOOL_CONTAINER:$TOOL_PKG_MGR]"
                 dbx_pkgs+=("$TOOL_NAME")
                 dbx_containers+=("$TOOL_CONTAINER")
